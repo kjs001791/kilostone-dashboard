@@ -1,7 +1,7 @@
 # 🚛 KiloStone Dashboard
 > **Legacy to Smart: Personalized Logistics Data Analytics System**
 
-![Python](https://img.shields.io/badge/Python-3.9-3776AB?style=flat&logo=python&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.11-3776AB?style=flat&logo=python&logoColor=white)
 ![Streamlit](https://img.shields.io/badge/Streamlit-1.24.0-FF4B4B?style=flat&logo=streamlit&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-Build_Source-2496ED?style=flat&logo=docker&logoColor=white)
 ![Gemini API](https://img.shields.io/badge/AI-Google_Gemini-8E75B2?style=flat&logo=google&logoColor=white)
