@@ -20,6 +20,8 @@ RUN apt-get update && apt-get install -y \
     pkg-config \
     libssl-dev \
     default-libmysqlclient-dev \
+    git \
+    cmake \
     && rm -rf /var/lib/apt/lists/*
 
 # 3. 파이썬 빌드 도구 업데이트
@@ -28,9 +30,11 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel Cython pybind11
 # 4. [중요] 핵심 라이브러리 소스 빌드
 # Numpy, Pandas는 바이너리로 설치하면 AVX 오류가 나므로 소스에서 직접 컴파일합니다.
 # 시간이 걸리지만 GitHub 서버가 대신 수행하므로 괜찮습니다.
-RUN pip install --no-cache-dir --no-binary numpy,pandas \
+RUN pip install --no-cache-dir \
+    --no-binary numpy,pandas,pyarrow \
     "numpy<1.27.0" \
-    "pandas<2.2.0"
+    "pandas<2.2.0" \
+    "pyarrow<15.0.0"
 
 # 5. 나머지 라이브러리 설치
 # requirements.txt에 있는 나머지 패키지들을 설치합니다.
@@ -63,7 +67,8 @@ COPY . .
 EXPOSE 8501
 
 # 5. 헬스 체크 (서버가 살아있는지 주기적으로 확인)
-HEALTHCHECK CMD curl --fail http://localhost:8501/_stcore/health || exit 1
+HEALTHCHECK --interval=30s --timeout=30s --start-period=60s --retries=5 \
+  CMD curl --fail http://localhost:8501/_stcore/health || exit 1
 
 # 6. 실행 명령어
 CMD ["streamlit", "run", "app/main.py", "--server.port=8501", "--server.address=0.0.0.0"]

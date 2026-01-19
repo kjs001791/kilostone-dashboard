@@ -13,11 +13,12 @@ services:
       - db
     volumes:
       - ./data:/app/data
-    networks:
-      - kilostone-network
+    # networks:
+    #  - kilostone-network
+    command: tail -f /dev/null
 
   db:
-    image: mysql:8.0
+    image: mariadb:10.6
     container_name: kilostone_db
     restart: unless-stopped
     environment:
@@ -29,6 +30,7 @@ services:
       - ./mysql:/var/lib/mysql
     networks:
       - kilostone-network
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
 
   watchtower:
     image: containrrr/watchtower
