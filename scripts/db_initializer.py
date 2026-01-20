@@ -59,6 +59,18 @@ def init_db():
     print("📂 최종 데이터(CSV) 로드 중...")
     df = pd.read_csv(final_csv_path)
     
+    # 1. DB에 넣기로 약속한 '진짜 컬럼' 리스트 정의
+    valid_columns = [
+        'date', 'vehicle_id', 'fuel_efficiency', 'speed', 'time', 
+        'distance', 'cumulative_distance', 'consumed_fuel', 'refuel', 'reurea'
+    ]
+
+    # 2. DataFrame에서 유효한 컬럼만 쏙 뽑아내기 (Unnamed 컬럼 자동 제거됨)
+    # (CSV에 해당 컬럼이 실제로 존재할 때만 가져옵니다)
+    df = df[[c for c in valid_columns if c in df.columns]]
+    
+    print(f"✨ 불필요한 컬럼 제거 완료. 적재 컬럼: {list(df.columns)}")
+    
     # NaN(빈 값) 처리: DB에 넣을 때는 NaN을 None(NULL)으로 바꿔주는 게 좋습니다.
     df = df.where(pd.notnull(df), None)
 

@@ -14,8 +14,7 @@ def apply_corrections():
     input_csv_path = project_root / 'data' / 'processed' / 'driving_log_2016_2020_messy_cleaned.csv'
     
     # 입력 2: AI 제안 파일 (가장 최근에 생성된 파일명을 여기에 적어주세요)
-    # 예: cleaning_proposal_ai_20260118_040233.csv
-    proposal_filename = 'cleaning_proposal_ai_20260118_040233.csv' 
+    proposal_filename = 'cleaning_proposal_ai_20260120_163939.csv' 
     proposal_csv_path = project_root / 'data' / proposal_filename
     
     # 출력: 최종 파일

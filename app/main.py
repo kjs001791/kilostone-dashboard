@@ -13,19 +13,32 @@ from services.database import get_db_engine
 # 1. 전역 설정 및 상수 정의
 # -----------------------------------------------------------------------------
 st.set_page_config(
-    page_title="KILOSTONE",
-    page_icon="🚛",
+    page_title="KiloStone Dashboard",
+    page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# 한글 라벨 매핑 (전역 사용)
+# Google AI Studio 스타일 팔레트
+THEME = {
+    "bg_main": "#121212",       
+    "bg_sidebar": "#1E1E1E",    
+    "text_main": "#FFFFFF",     
+    "text_sub": "#9aa0a6",      # 구글 특유의 회색 텍스트
+    "accent_primary": "#8AB4F8", # 구글 블루
+    "accent_green": "#81C995",  
+    "accent_red": "#F28B82",    
+    "accent_yellow": "#FDD663", 
+    "border": "#3C4043"         
+}
+
+# 한글 라벨 매핑
 LABEL_MAP = {
     "date": "날짜",
     "vehicle_id": "차량 ID",
     "fuel_efficiency": "연비 (km/L)",
     "speed": "평균 속도 (km/h)",
-    "time": "운행 시간",
+    "time": "운행 시간 (분)",
     "distance": "주행 거리 (km)",
     "cumulative_distance": "누적 주행 거리 (km)",
     "consumed_fuel": "연료 소모량 (L)",
@@ -33,67 +46,130 @@ LABEL_MAP = {
     "reurea": "요소수 (L)"
 }
 
-# 다크 테마용 컬러 팔레트 (가시성 확보)
-COLORS = {
-    "primary": "#00CC96",    # 녹색 (긍정, 연비)
-    "danger": "#EF553B",     # 적색 (경고, 소모)
-    "info": "#AB63FA",       # 보라 (거리, 속도)
-    "warning": "#FFA15A",    # 주황 (주유)
-    "bg_mix": "#1F2630"      # 차트 배경색
-}
-
-# CSS: 로고 확대 및 스타일링
-# CSS: KILOSTONE 로고를 사이드바에 꽉 채우기 위한 강제 스타일링
-st.markdown("""
+# -----------------------------------------------------------------------------
+# 2. CSS 스타일링 (Flat & Clean Design)
+# -----------------------------------------------------------------------------
+st.markdown(f"""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Teko:wght@700&display=swap');
-    
-    /* 1. Streamlit 사이드바의 기본 여백을 강제로 줄임 (핵심) */
-    section[data-testid="stSidebar"] div[class*="css"] {
-        padding-top: 2rem;
-        padding-bottom: 0rem;
-        /* 좌우 여백을 줄여서 글자가 들어갈 공간 확보 */
-        padding-left: 1rem; 
-        padding-right: 1rem;
-    }
+    @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap');
 
-    /* 2. 로고 텍스트 스타일 */
-    .logo-text {
-        font-family: 'Teko', sans-serif;
-        /* 화면 크기에 반응하지 않고 무조건 거대하게 설정 (Teko는 좁아서 110px은 줘야 꽉 참) */
-        font-size: 50px !important;  
-        font-weight: 700;
-        font-style: italic;
-        color: #e0e0e0;
-        
-        /* 텍스트 정렬 및 배치 */
-        text-align: center;
-        line-height: 0.8;      /* 줄 간격을 좁혀서 위아래 공백 제거 */
-        margin-top: -20px;     /* 위쪽으로 더 바짝 붙이기 */
-        margin-bottom: 20px;
-        
-        /* 텍스트 효과 */
-        text-shadow: 5px 5px 0px #000;
-        letter-spacing: -1px;  /* 자간을 살짝 좁혀서 단단한 느낌 */
-        
-        /* 줄바꿈 방지 (글자가 너무 커도 한 줄에 나오게 강제) */
-        white-space: nowrap;
-    }
+    /* [기본] 전체 폰트 및 배경 설정 */
+    .stApp {{
+        background-color: {THEME['bg_main']};
+        font-family: 'Roboto', sans-serif;
+    }}
     
-    /* 기존 메트릭 스타일 유지 */
-    div[data-testid="stMetricValue"] {
-        font-size: 26px;
-        color: #ffffff;
-    }
-    div[data-testid="stMetricLabel"] {
+    /* [사이드바] */
+    [data-testid="stSidebar"] {{
+        background-color: {THEME['bg_sidebar']};
+        border-right: 1px solid {THEME['border']};
+        width: 235px !important;
+    }}
+    div[data-testid="stSidebar"] > div:nth-child(2) {{ display: none; }}
+    
+    .logo-text {{
+        font-family: 'Teko', sans-serif; 
+        font-size: 40px !important; 
+        font-weight: 700;
+        font-style: italic; color: #e0e0e0; text-align: center; line-height: 0.8;
+        margin-top: -10px; margin-bottom: 20px;
+        letter-spacing: -1px; white-space: nowrap;
+    }}
+
+    /* [탭 디자인] 구글 스타일 (심플한 밑줄) */
+    .stTabs [data-baseweb="tab-list"] {{
+        background-color: transparent;
+        border-bottom: 1px solid {THEME['border']};
+        gap: 24px;
+        padding-bottom: 0px;
+    }}
+    
+    .stTabs [data-baseweb="tab"] {{
+        height: 40px;
+        background-color: transparent;
+        border: none;
+        color: {THEME['text_sub']};
         font-size: 14px;
-        color: #aaaaaa;
-    }
+        font-weight: 500;
+        padding: 0 0 10px 0;
+    }}
+
+    /* 선택된 탭 텍스트 색상만 변경 (밑줄은 아래 highlight가 담당) */
+    .stTabs [aria-selected="true"] {{
+        color: #8AB4F8 !important; 
+        /* border-bottom 삭제함: 고정된 줄이 아니라 움직이는 줄을 쓸 것이므로 */
+    }}
+    
+    /* [핵심] Streamlit의 움직이는 애니메이션 바(Highlight) 색상 변경 */
+    div[data-baseweb="tab-highlight"] {{
+        background-color: #8AB4F8 !important; /* 기본 빨간색 -> 파란색 변경 */
+    }}
+    
+    .stTabs [data-baseweb="tab"]:hover {{
+        color: {THEME['text_main']};
+    }}
+
+    /* [KPI 컨테이너] Streamlit Native Container 스타일링 */
+    /* st.container(border=True)의 테두리와 배경색을 변경 */
+    [data-testid="stVerticalBlockBorderWrapper"] {{
+        background-color: #1E1E1E; /* 카드 배경색 */
+        border: 1px solid #3C4043;
+        border-radius: 12px;
+        padding: 20px;
+    }}
+
+    /* KPI 텍스트 스타일 */
+    .kpi-title {{
+        color: {THEME['text_sub']};
+        font-size: 14px;
+        margin-bottom: 4px;
+        text-align: center;
+    }}
+    
+    .kpi-value {{
+        color: {THEME['text_main']};
+        font-size: 32px;
+        font-weight: 700;
+        text-align: center;
+        white-space: nowrap;
+    }}
+    
+    .kpi-delta {{
+        font-size: 13px;
+        margin-top: 4px;
+        text-align: center;
+        display: flex;
+        justify-content: center;
+        gap: 5px;
+    }}
+
+    /* 차트 제목 스타일 (박스 밖) */
+    .chart-header {{
+        color: {THEME['text_sub']};
+        font-size: 16px;
+        font-weight: 500;
+        margin-bottom: 10px;
+        margin-top: 20px;
+        padding-left: 5px;
+        border-left: 3px solid {THEME['accent_primary']};
+        line-height: 1;
+    }}
+
+    /* 데이터프레임 */
+    [data-testid="stDataFrame"] {{
+        background-color: transparent;
+    }}
+    
+    /* 구분선 */
+    hr {{
+        border-color: {THEME['border']};
+    }}
     </style>
     """, unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# 2. 데이터 로드 함수
+# 3. 데이터 로드 함수
 # -----------------------------------------------------------------------------
 @st.cache_data(ttl=600)
 def load_data():
@@ -106,12 +182,18 @@ def load_data():
         ORDER BY date ASC
         """
         df = pd.read_sql(query, engine)
-        
-        # 전처리
         df['date'] = pd.to_datetime(df['date'])
+        
+        if 'time' in df.columns:
+            time_td = pd.to_timedelta(df['time'].astype(str), errors='coerce')
+            time_num = pd.to_numeric(df['time'], errors='coerce')
+            df['time_minutes'] = time_td.dt.total_seconds() / 60
+            df['time_minutes'] = df['time_minutes'].fillna(time_num).fillna(0)
+            df['time'] = df['time_minutes']
+        
         numeric_cols = ['fuel_efficiency', 'speed', 'distance', 'cumulative_distance', 'consumed_fuel', 'refuel']
         for col in numeric_cols:
-            df[col] = pd.to_numeric(df[col], errors='coerce')
+            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
             
         return df
     except Exception as e:
@@ -119,139 +201,226 @@ def load_data():
         return pd.DataFrame()
 
 # -----------------------------------------------------------------------------
-# 3. 메인 로직
+# 4. 차트 헬퍼 함수 (박스 제거, 깔끔한 배경)
+# -----------------------------------------------------------------------------
+def create_clean_chart(fig, height=300):
+    fig.update_layout(
+        template="plotly_dark",
+        paper_bgcolor="rgba(0,0,0,0)", # 투명 배경
+        plot_bgcolor="rgba(0,0,0,0)",  # 투명 배경
+        height=height,
+        margin=dict(l=0, r=0, t=20, b=20), # 여백 최소화
+        xaxis=dict(showgrid=False, color=THEME['text_sub'], gridcolor=THEME['border']),
+        yaxis=dict(showgrid=True, gridcolor=THEME['border'], color=THEME['text_sub'], zeroline=False),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(color=THEME['text_sub'])),
+        hovermode="x unified"
+    )
+    return fig
+
+# -----------------------------------------------------------------------------
+# 5. 메인 로직
 # -----------------------------------------------------------------------------
 def main():
-    # --- Sidebar ---
     with st.sidebar:
         st.markdown('<p class="logo-text">KILOSTONE</p>', unsafe_allow_html=True)
-        st.divider()
         
         df = load_data()
         
-        df = load_data()
         if df.empty:
             st.warning("데이터가 없습니다.")
             return
 
-        # 날짜 필터
+        st.markdown(f"<p style='color:{THEME['text_main']}; font-weight:500; margin-top:20px;'>📅 기간 설정</p>", unsafe_allow_html=True)
         min_date, max_date = df['date'].min().date(), df['date'].max().date()
-        date_range = st.date_input("📅 분석 기간 설정", value=(min_date, max_date), min_value=min_date, max_value=max_date)
+        date_range = st.date_input("", value=(min_date, max_date), min_value=min_date, max_value=max_date, label_visibility="collapsed")
         
-        # 성능 최적화를 위한 리샘플링 옵션 (버벅임 해결의 핵심)
-        resample_option = st.radio("📊 그래프 상세도 (성능 최적화)", ["일별(Daily)", "주별(Weekly)", "월별(Monthly)"], index=1)
+        st.markdown(f"<br><p style='color:{THEME['text_main']}; font-weight:500;'>📊 보기 방식</p>", unsafe_allow_html=True)
+        resample_option = st.radio("", ["일별 (Daily)", "주별 (Weekly)", "월별 (Monthly)"], index=1, label_visibility="collapsed")
         
-        # 데이터 필터링
+        st.divider()
+        st.markdown(f"<div style='text-align:center; color:{THEME['text_sub']}; font-size:12px;'>Connected to Server</div>", unsafe_allow_html=True)
+
         if isinstance(date_range, tuple) and len(date_range) == 2:
             start, end = date_range
             filtered_df = df[(df['date'].dt.date >= start) & (df['date'].dt.date <= end)]
+            selected_days = (end - start).days + 1
         else:
             filtered_df = df
+            selected_days = 1
 
-    # --- 데이터 리샘플링 (차트 렌더링 속도 향상용) ---
-    chart_df = filtered_df.copy()
-    if resample_option == "주별(Weekly)":
-        chart_df = chart_df.resample('W-MON', on='date').mean(numeric_only=True).reset_index()
-    elif resample_option == "월별(Monthly)":
-        chart_df = chart_df.resample('M', on='date').mean(numeric_only=True).reset_index()
-    # 일별일 경우 원본 그대로 사용
-
-    # --- KPI Section ---
-    st.markdown("### 🚦 핵심 운행 지표")
-    kpi1, kpi2, kpi3, kpi4 = st.columns(4)
+    # --- Main Content ---
+    # 헤더 제거하고 바로 탭으로 시작하여 공간 효율 극대화
     
-    with kpi1:
-        st.metric(label="총 주행 거리", value=f"{filtered_df['distance'].sum():,.1f} km")
-    with kpi2:
+    # 탭 메뉴
+    tab1, tab2 = st.tabs(["전체 운행 현황", "차량별 비교 분석"])
+
+    # -------------------------------------------------------------------------
+    # TAB 1: 전체 운행 현황
+    # -------------------------------------------------------------------------
+    with tab1:
+        # 데이터 리샘플링
+        chart_df = filtered_df.copy()
+        if "주별" in resample_option:
+            chart_df = chart_df.resample('W-MON', on='date').mean(numeric_only=True).reset_index()
+        elif "월별" in resample_option:
+            chart_df = chart_df.resample('M', on='date').mean(numeric_only=True).reset_index()
+
+        # --- KPI Section (Streamlit Native Container 사용 - 반응형 완벽 지원) ---
+        # 억지로 높이를 맞추지 않고 내용물에 따라 늘어나게 함
+        st.markdown("<br>", unsafe_allow_html=True) # 상단 여백
+        
+        kpi_col1, kpi_col2, kpi_col3, kpi_col4 = st.columns(4)
+        
+        # KPI 렌더링 함수 (Native Container 안에 HTML 주입)
+        def render_kpi(container, title, value, delta_val=None, delta_suffix=""):
+            with container:
+                # [중요] border=True 옵션 사용: Streamlit이 알아서 크기 조절해주는 박스 생성
+                with st.container(border=True):
+                    delta_html = ""
+                    if delta_val is not None:
+                        color = THEME['accent_green'] if delta_val >= 0 else THEME['accent_red']
+                        sign = "▲" if delta_val >= 0 else "▼"
+                        delta_html = f"<span style='color:{color}'>{sign} {abs(delta_val):.2f}{delta_suffix}</span>"
+                    
+                    st.markdown(f"""
+                        <div class="kpi-title">{title}</div>
+                        <div class="kpi-value">{value}</div>
+                        <div class="kpi-delta">{delta_html}</div>
+                    """, unsafe_allow_html=True)
+
+        # KPI 계산
+        total_days = (df['date'].max() - df['date'].min()).days + 1
+        avg_daily_dist_all = df['distance'].sum() / total_days
+        curr_daily_dist = filtered_df['distance'].sum() / selected_days
+        
+        avg_daily_time_all = df['time'].sum() / total_days
+        curr_daily_time = filtered_df['time'].sum() / selected_days
+        
+        avg_daily_fuel_all = df['consumed_fuel'].sum() / total_days
+        curr_daily_fuel = filtered_df['consumed_fuel'].sum() / selected_days
+
+        # KPI 1: 평균 연비
         current_eff = filtered_df['fuel_efficiency'].mean()
-        st.metric(label="평균 연비", value=f"{current_eff:.2f} km/L")
-    with kpi3:
-        st.metric(label="총 연료 소모", value=f"{filtered_df['consumed_fuel'].sum():,.0f} L")
-    with kpi4:
-        last_cum = filtered_df['cumulative_distance'].iloc[-1] if not filtered_df.empty else 0
-        st.metric(label="차량 총 누적 거리", value=f"{last_cum:,.0f} km")
+        delta_eff = current_eff - df['fuel_efficiency'].mean()
+        render_kpi(kpi_col1, "평균 연비", f"{current_eff:.2f} km/L", delta_eff)
 
-    st.markdown("---")
+        # KPI 2: 총 주행 거리
+        delta_dist = curr_daily_dist - avg_daily_dist_all
+        render_kpi(kpi_col2, "총 주행 거리", f"{filtered_df['distance'].sum():,.0f} km", delta_dist)
 
-    # --- Charts Section (2x2 Grid) ---
-    
-    # 공통 차트 설정 함수 (스타일 통일)
-    def update_chart_layout(fig, title):
-        fig.update_layout(
-            title=dict(text=title, font=dict(size=20, color="white")),
-            template="plotly_dark",
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)",
-            hovermode="x unified",
-            margin=dict(l=20, r=20, t=50, b=20)
-        )
-        return fig
-
-    c1, c2 = st.columns(2)
-
-    # 1. 연비 추이 (Line)
-    with c1:
-        fig_eff = px.line(
-            chart_df, x='date', y='fuel_efficiency',
-            labels=LABEL_MAP, # 한글 라벨 적용
-            markers=True if len(chart_df) < 100 else False, # 점이 너무 많으면 선만 표시
-        )
-        fig_eff.update_traces(line_color=COLORS['primary'], line_width=3)
-        # 평균선
-        avg_eff = filtered_df['fuel_efficiency'].mean()
-        fig_eff.add_hline(y=avg_eff, line_dash="dot", line_color="gray", annotation_text="기간 평균")
-        st.plotly_chart(update_chart_layout(fig_eff, "📈 연비 추이 분석"), use_container_width=True)
-
-    # 2. 주행 거리 (Bar) - 가시성 개선
-    with c2:
-        fig_dist = px.bar(
-            chart_df, x='date', y='distance',
-            labels=LABEL_MAP,
-            color='distance',
-            # 기존 Bluered 대신 가시성 좋은 커스텀 컬러 적용
-            color_continuous_scale=[[0, COLORS['bg_mix']], [1, COLORS['info']]] 
-        )
-        st.plotly_chart(update_chart_layout(fig_dist, "🚛 운행 강도 (주행 거리)"), use_container_width=True)
-
-    c3, c4 = st.columns(2)
-
-    # 3. 연료 밸런스 (Area)
-    with c3:
-        fig_fuel = go.Figure()
-        # 주유량 (Bar로 변경하여 더 잘 보이게 함)
-        fig_fuel.add_trace(go.Bar(
-            x=chart_df['date'], y=chart_df['refuel'],
-            name='주유량', marker_color=COLORS['warning'], opacity=0.8
-        ))
-        # 소모량 (Line + Area)
-        fig_fuel.add_trace(go.Scatter(
-            x=chart_df['date'], y=chart_df['consumed_fuel'],
-            name='소모량', fill='tozeroy', line=dict(color=COLORS['danger'], width=2)
-        ))
-        fig_fuel.update_layout(legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
-        st.plotly_chart(update_chart_layout(fig_fuel, "⛽ 연료 소모 vs 주유 패턴"), use_container_width=True)
-
-    # 4. 속도 vs 연비 (Scatter) - 샘플링 필요 (데이터가 너무 많으면 버벅임)
-    with c4:
-        # 산점도는 원본 데이터를 쓰되, 너무 많으면 최근 500개만 보여주거나 샘플링
-        scatter_sample = filtered_df.sample(n=min(500, len(filtered_df))) if len(filtered_df) > 500 else filtered_df
-        if not scatter_sample.empty and scatter_sample['speed'].notnull().any():
-            fig_corr = px.scatter(
-                scatter_sample, x='speed', y='fuel_efficiency',
-                size='distance', color='fuel_efficiency',
-                labels=LABEL_MAP,
-                color_continuous_scale='Viridis', # 밝은 색상 척도
-                opacity=0.8
-            )
-            st.plotly_chart(update_chart_layout(fig_corr, "⚙️ 속도와 연비의 상관관계 (Sampled)"), use_container_width=True)
+        # KPI 3: 총 운행 시간
+        total_minutes = filtered_df['time'].sum()
+        if total_minutes > 60:
+            time_str = f"{int(total_minutes // 60):,}시간" # 예: 11,432시간
         else:
-            st.info("속도 데이터가 충분하지 않습니다.")
+            time_str = f"{int(total_minutes)}분"
+        delta_time = curr_daily_time - avg_daily_time_all
+        render_kpi(kpi_col3, "총 운행 시간", time_str, delta_time)
 
-    # --- Raw Data Section ---
-    st.subheader("📋 상세 로그 데이터")
-    # 컬럼명 한글로 변경하여 표시
-    display_df = filtered_df.rename(columns=LABEL_MAP).sort_values(by='날짜', ascending=False)
-    st.dataframe(display_df, use_container_width=True, height=300)
+        # KPI 4: 총 연료 소모량
+        delta_fuel = curr_daily_fuel - avg_daily_fuel_all
+        render_kpi(kpi_col4, "총 연료 소모량", f"{filtered_df['consumed_fuel'].sum():,.0f} L", delta_fuel)
+
+        st.divider() # 구분선
+
+        # --- Charts Section (박스 없이 깔끔하게 배치) ---
+        
+        col_row1_1, col_row1_2 = st.columns(2)
+
+        with col_row1_1:
+            st.markdown('<div class="chart-header">연비 추이 분석</div>', unsafe_allow_html=True)
+            fig_eff = px.line(chart_df, x='date', y='fuel_efficiency', labels=LABEL_MAP, markers=True if len(chart_df) < 50 else False)
+            fig_eff.update_traces(line_color=THEME['accent_green'], line_width=3)
+            avg_eff = filtered_df['fuel_efficiency'].mean()
+            fig_eff.add_hline(y=avg_eff, line_dash="dot", line_color=THEME['text_sub'], annotation_text="평균")
+            st.plotly_chart(create_clean_chart(fig_eff), use_container_width=True)
+
+        with col_row1_2:
+            st.markdown('<div class="chart-header">주행 거리 추이</div>', unsafe_allow_html=True)
+            fig_dist = px.bar(chart_df, x='date', y='distance', labels=LABEL_MAP)
+            fig_dist.update_traces(marker_color=THEME['accent_primary'], marker_line_width=0)
+            st.plotly_chart(create_clean_chart(fig_dist), use_container_width=True)
+
+        st.markdown("<br>", unsafe_allow_html=True) # 간격
+
+        col_row2_1, col_row2_2 = st.columns(2)
+
+        with col_row2_1:
+            st.markdown('<div class="chart-header">연료 소모 vs 주유</div>', unsafe_allow_html=True)
+            fig_fuel = go.Figure()
+            fig_fuel.add_trace(go.Bar(x=chart_df['date'], y=chart_df['refuel'], name='주유량', marker_color=THEME['accent_yellow'], opacity=0.8))
+            fig_fuel.add_trace(go.Scatter(
+                x=chart_df['date'], y=chart_df['consumed_fuel'], name='소모량', fill='tozeroy', 
+                line=dict(color=THEME['accent_red'], width=2), fillcolor=f"rgba(242, 139, 130, 0.2)"
+            ))
+            st.plotly_chart(create_clean_chart(fig_fuel), use_container_width=True)
+
+        with col_row2_2:
+            st.markdown('<div class="chart-header">속도와 연비 상관관계</div>', unsafe_allow_html=True)
+            scatter_sample = filtered_df.sample(n=min(500, len(filtered_df))) if len(filtered_df) > 500 else filtered_df.copy()
+            if not scatter_sample.empty:
+                scatter_sample['distance'] = scatter_sample['distance'].fillna(0)
+            
+            if not scatter_sample.empty and scatter_sample['speed'].notnull().any():
+                fig_corr = px.scatter(
+                    scatter_sample, x='speed', y='fuel_efficiency',
+                    size='distance', 
+                    labels=LABEL_MAP,
+                    opacity=0.7
+                )
+                fig_corr.update_traces(marker=dict(color=THEME['accent_green'], line=dict(width=1, color=THEME['bg_sidebar'])))
+                st.plotly_chart(create_clean_chart(fig_corr), use_container_width=True)
+            else:
+                st.info("데이터가 부족합니다.")
+
+    # -------------------------------------------------------------------------
+    # TAB 2: 차량별 비교 분석
+    # -------------------------------------------------------------------------
+    with tab2:
+        st.markdown("<br>", unsafe_allow_html=True)
+        vehicle_group = filtered_df.groupby('vehicle_id').agg({
+            'distance': 'sum',
+            'fuel_efficiency': 'mean',
+            'consumed_fuel': 'sum',
+            'time': 'sum'
+        }).reset_index()
+
+        c_v1, c_v2 = st.columns(2)
+        with c_v1:
+            st.markdown('<div class="chart-header">차량별 총 주행 거리</div>', unsafe_allow_html=True)
+            fig_v_dist = px.bar(
+                vehicle_group, x='vehicle_id', y='distance',
+                color='vehicle_id',
+                labels=LABEL_MAP,
+                text_auto='.2s'
+            )
+            fig_v_dist.update_traces(textfont_size=12, textangle=0, textposition="outside", cliponaxis=False)
+            st.plotly_chart(create_clean_chart(fig_v_dist), use_container_width=True)
+
+        with c_v2:
+            st.markdown('<div class="chart-header">차량별 평균 연비</div>', unsafe_allow_html=True)
+            fig_v_eff = px.bar(
+                vehicle_group, x='vehicle_id', y='fuel_efficiency',
+                color='vehicle_id',
+                labels=LABEL_MAP,
+                text_auto='.2f'
+            )
+            avg_all_eff = vehicle_group['fuel_efficiency'].mean()
+            fig_v_eff.add_hline(y=avg_all_eff, line_dash="dot", line_color=THEME['text_sub'], annotation_text="전체 평균")
+            st.plotly_chart(create_clean_chart(fig_v_eff), use_container_width=True)
+
+        # 차량별 상세 데이터 (박스 없음)
+        st.markdown('<div class="chart-header">차량별 상세 데이터</div>', unsafe_allow_html=True)
+        st.dataframe(
+            vehicle_group.rename(columns=LABEL_MAP).sort_values(by='주행 거리 (km)', ascending=False),
+            use_container_width=True
+        )
+
+    # 공통: 하단 원본 데이터 로그
+    st.divider()
+    with st.expander("📋 전체 로그 데이터 확인하기", expanded=True):
+        display_df = filtered_df.rename(columns=LABEL_MAP).sort_values(by='날짜', ascending=False)
+        st.dataframe(display_df, use_container_width=True, height=400)
 
 if __name__ == "__main__":
     main()
