@@ -9,12 +9,21 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from services.database import get_db_engine
 
+# 1. 현재 파일(main.py)이 있는 폴더 경로 구하기
+current_dir = os.path.dirname(os.path.abspath(__file__))
+
+# 2. 한 단계 상위 폴더(프로젝트 루트)로 이동
+project_root = os.path.dirname(current_dir)
+
+# 3. assets 폴더와 파일명 합치기
+icon_path = os.path.join(project_root, 'assets', 'logo.ico')
+
 # -----------------------------------------------------------------------------
 # 1. 전역 설정 및 상수 정의
 # -----------------------------------------------------------------------------
 st.set_page_config(
-    page_title="KiloStone Dashboard",
-    page_icon="📊",
+    page_title="KiloStone",
+    page_icon=icon_path,
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -230,11 +239,11 @@ def main():
             st.warning("데이터가 없습니다.")
             return
 
-        st.markdown(f"<p style='color:{THEME['text_main']}; font-weight:500; margin-top:20px;'>📅 기간 설정</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='color:{THEME['text_main']}; font-weight:500; margin-top:20px;'>기간 설정</p>", unsafe_allow_html=True)
         min_date, max_date = df['date'].min().date(), df['date'].max().date()
         date_range = st.date_input("", value=(min_date, max_date), min_value=min_date, max_value=max_date, label_visibility="collapsed")
         
-        st.markdown(f"<br><p style='color:{THEME['text_main']}; font-weight:500;'>📊 보기 방식</p>", unsafe_allow_html=True)
+        st.markdown(f"<br><p style='color:{THEME['text_main']}; font-weight:500;'>보기 방식</p>", unsafe_allow_html=True)
         resample_option = st.radio("", ["일별 (Daily)", "주별 (Weekly)", "월별 (Monthly)"], index=1, label_visibility="collapsed")
         
         st.divider()
@@ -328,7 +337,7 @@ def main():
         col_row1_1, col_row1_2 = st.columns(2)
 
         with col_row1_1:
-            st.markdown('<div class="chart-header">연비 추이 분석</div>', unsafe_allow_html=True)
+            st.markdown('<div class="chart-header">연비 추이</div>', unsafe_allow_html=True)
             fig_eff = px.line(chart_df, x='date', y='fuel_efficiency', labels=LABEL_MAP, markers=True if len(chart_df) < 50 else False)
             fig_eff.update_traces(line_color=THEME['accent_green'], line_width=3)
             avg_eff = filtered_df['fuel_efficiency'].mean()
@@ -346,7 +355,7 @@ def main():
         col_row2_1, col_row2_2 = st.columns(2)
 
         with col_row2_1:
-            st.markdown('<div class="chart-header">연료 소모 vs 주유</div>', unsafe_allow_html=True)
+            st.markdown('<div class="chart-header">주유량 대비 연료 소모량</div>', unsafe_allow_html=True)
             fig_fuel = go.Figure()
             fig_fuel.add_trace(go.Bar(x=chart_df['date'], y=chart_df['refuel'], name='주유량', marker_color=THEME['accent_yellow'], opacity=0.8))
             fig_fuel.add_trace(go.Scatter(
@@ -356,7 +365,7 @@ def main():
             st.plotly_chart(create_clean_chart(fig_fuel), use_container_width=True)
 
         with col_row2_2:
-            st.markdown('<div class="chart-header">속도와 연비 상관관계</div>', unsafe_allow_html=True)
+            st.markdown('<div class="chart-header">속도와 연비의 상관관계</div>', unsafe_allow_html=True)
             scatter_sample = filtered_df.sample(n=min(500, len(filtered_df))) if len(filtered_df) > 500 else filtered_df.copy()
             if not scatter_sample.empty:
                 scatter_sample['distance'] = scatter_sample['distance'].fillna(0)
