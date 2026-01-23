@@ -1,51 +1,81 @@
-version: '3.8'
-
 services:
+  # ----------------------------------------------------------------
+  # [App] Streamlit Dashboard
+  # ----------------------------------------------------------------
   dashboard:
-    # [핵심 변경 1] 이미지를 다운받지 말고, 현재 폴더(.)의 Dockerfile로 직접 빌드하라
+    # [Build Context]
+    # 외부 이미지를 Pull 하지 않고, 현재 디렉토리(.)의 Dockerfile을 기반으로 빌드 수행
     build:
       context: .
-    image: kilostone-dashboard:aws-v1  # 로컬에서 관리할 이름 (도커 허브용 아님)
+    
+    # [Image Tag]
+    # 로컬 레지스트리에서 관리될 이미지 식별자
+    image: kilostone-dashboard:aws-v1
     container_name: kilostone_app
+    
+    # [Restart Policy]
+    # 명시적 중단(stop) 외의 모든 종료 상황(오류, 재부팅 등)에서 컨테이너 자동 재시작
     restart: unless-stopped
+    
+    # [Port Mapping]
+    # Host Port : Container Port (외부 8501 요청을 컨테이너 8501로 포워딩)
     ports:
       - "8501:8501"
+    
+    # [Environment Variables]
+    # 민감 정보(Credentials) 및 환경 설정을 .env 파일로부터 주입
     env_file:
       - .env
+    
+    # [Dependency]
+    # DB 서비스가 완전히 초기화된 후 애플리케이션 컨테이너 시작
     depends_on:
       - db
+    
+    # [Volume Bind Mount]
+    # 소스 코드 및 데이터 파일 동기화 (Host Path : Container Path)
     volumes:
       - ./data:/app/data
-    networks:  # [핵심 변경 2] 주석 해제 (DB와 연결 필수)
+    
+    # [Network]
+    # 내부 서비스 간 통신을 위한 사용자 정의 브리지 네트워크 연결
+    networks:
       - kilostone-network
-    # [핵심 변경 3] command: tail -f ... 삭제함 (Dockerfile의 CMD를 따르도록)
 
+  # ----------------------------------------------------------------
+  # [Database] MariaDB
+  # ----------------------------------------------------------------
   db:
-    image: mariadb:10.6  # [추천] 1GB 램 환경에서는 MySQL보다 훨씬 안정적임
+    # [Base Image]
+    # 리소스 효율성(Memory Footprint)을 고려하여 MySQL 대신 MariaDB 10.6 사용
+    image: mariadb:10.6
     container_name: kilostone_db
     restart: unless-stopped
+    
+    # [Initial Configuration]
+    # 컨테이너 최초 실행 시 적용될 DB 접속 정보 및 루트 권한 설정
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
       MYSQL_DATABASE: ${DB_NAME}
       MYSQL_USER: ${DB_USER}
       MYSQL_PASSWORD: ${DB_PASSWORD}
+    
+    # [Data Persistence]
+    # 컨테이너 수명 주기와 무관하게 데이터를 영구 보존하기 위해 Host Volume 마운트
     volumes:
       - ./mysql:/var/lib/mysql
+    
     networks:
       - kilostone-network
-    # 한글 깨짐 방지 설정
+    
+    # [Character Set]
+    # 한글 데이터 처리를 위한 UTF-8(mb4) 인코딩 강제 설정
     command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
 
-  watchtower:
-    image: containrrr/watchtower
-    container_name: watchtower
-    restart: unless-stopped
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    command: --interval 60 --cleanup
-    networks:
-      - kilostone-network
-
+# ----------------------------------------------------------------
+# [Network Infrastructure]
+# ----------------------------------------------------------------
 networks:
   kilostone-network:
+    # 컨테이너 간 Hostname(Service Name) 기반 통신을 지원하는 Bridge 드라이버 사용
     driver: bridge

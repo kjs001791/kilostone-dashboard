@@ -1,32 +1,31 @@
 # --- [대시보드 프레임워크] ---
-streamlit           # 웹 대시보드 메인
-watchdog            # 코드 수정 시 자동 새로고침 기능
+streamlit                   # 웹 대시보드 메인 UI
+watchdog                    # 코드 수정 시 자동 새로고침 (개발용)
 
-# --- [데이터 처리 및 분석] ---
-pandas              # 데이터프레임 처리
-numpy               # 수치 계산
-pyarrow             # 대용량 데이터 처리 (Streamlit 필수 권장)
-openpyxl            # 엑셀 파일 읽기/쓰기
-et_xmlfile          # 엑셀 XML 지원
+# --- [데이터 처리] ---
+pandas                      # 데이터프레임 및 시계열 처리
+numpy                       # 수치 계산 및 배열 처리
+pyarrow                     # 대용량 데이터 처리 속도 최적화 (권장)
+openpyxl                    # 엑셀 파일(.xlsx) 읽기/쓰기
+et_xmlfile                  # 엑셀 XML 파싱 엔진
 
-# --- [데이터베이스 연결] ---
-# (코드에서 사용 중이므로 필수 추가)
-pymysql             # MySQL/MariaDB 연결 드라이버
-sqlalchemy          # ORM 및 DB 연결 관리
+# --- [데이터베이스] ---
+pymysql                     # MariaDB/MySQL 연결 드라이버
+sqlalchemy                  # SQL ORM 및 DB 연결 관리
 
-# --- [시각화 (차트)] ---
-plotly              # 인터랙티브 차트
-altair              # 통계적 시각화
-pydeck              # 지도 및 3D 시각화 (선택 사항)
-pillow              # 이미지 처리
+# --- [시각화] ---
+plotly                      # 인터랙티브(줌, 팬) 차트
+altair                      # 통계적 시각화 (Streamlit 내장)
+pydeck                      # 지도 및 3D 데이터 시각화
+pillow                      # 이미지 처리 및 썸네일 생성
 
-# --- [구글 생성형 AI (Gemini)] ---
-google-generativeai # Gemini API 사용
-google-auth         # 구글 인증 관리
-google-api-python-client
+# --- [AI 및 Google 연동] ---
+google-generativeai         # Gemini Pro/Flash API 호출
+google-auth                 # 구글 서비스 인증 관리
+google-api-python-client    # 구글 API 공용 클라이언트
 
-# --- [유틸리티 & 환경설정] ---
-python-dotenv       # .env 파일 로드 (API 키 관리)
-requests            # HTTP 요청 (API 호출 등)
-python-dateutil     # 날짜/시간 처리
-pytz                # 타임존 처리
+# --- [유틸리티] ---
+python-dotenv               # .env 환경변수 파일 로드
+requests                    # HTTP 요청 및 API 호출
+python-dateutil             # 복잡한 날짜/시간 파싱
+pytz                        # 전 세계 타임존(TimeZone) 처리
