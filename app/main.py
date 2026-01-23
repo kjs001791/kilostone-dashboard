@@ -338,14 +338,6 @@ def main():
 
         with col_row1_1:
             st.markdown('<div class="chart-header">연비 추이</div>', unsafe_allow_html=True)
-            fig_eff = px.line(chart_df, x='date', y='fuel_efficiency', labels=LABEL_MAP, markers=True if len(chart_df) < 50 else False)
-            fig_eff.update_traces(line_color=THEME['accent_green'], line_width=3)
-            avg_eff = filtered_df['fuel_efficiency'].mean()
-            fig_eff.add_hline(y=avg_eff, line_dash="dot", line_color=THEME['text_sub'], annotation_text="평균")
-            st.plotly_chart(create_clean_chart(fig_eff), use_container_width=True)
-
-        with col_row1_1:
-            st.markdown('<div class="chart-header">연비 추이</div>', unsafe_allow_html=True)
             
             # 연비가 0보다 큰 데이터만 필터링하여 저장
             valid_eff_df = chart_df[chart_df['fuel_efficiency'] > 0]
