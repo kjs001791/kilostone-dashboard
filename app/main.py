@@ -344,13 +344,51 @@ def main():
             fig_eff.add_hline(y=avg_eff, line_dash="dot", line_color=THEME['text_sub'], annotation_text="평균")
             st.plotly_chart(create_clean_chart(fig_eff), use_container_width=True)
 
+        with col_row1_1:
+            st.markdown('<div class="chart-header">연비 추이</div>', unsafe_allow_html=True)
+            
+            # 연비가 0보다 큰 데이터만 필터링하여 저장
+            valid_eff_df = chart_df[chart_df['fuel_efficiency'] > 0]
+            
+            # 데이터가 존재하는 경우에만 시각화
+            if not valid_eff_df.empty:
+                fig_eff = px.line(valid_eff_df, x='date', y='fuel_efficiency', labels=LABEL_MAP, markers=True if len(valid_eff_df) < 50 else False)
+                fig_eff.update_traces(line_color=THEME['accent_green'], line_width=3)
+                
+                # 평균선 강조 및 수치 표시
+                avg_eff = valid_eff_df['fuel_efficiency'].mean()
+                fig_eff.add_hline(
+                    y=avg_eff, 
+                    line_dash="dash", 
+                    line_color=THEME['accent_red'], # 눈에 띄는 색(빨강)으로 변경
+                    line_width=2,
+                    annotation_text=f"평균: {avg_eff:.2f} km/L", # 값 직접 표시
+                    annotation_position="top left",
+                    annotation_font=dict(size=14, color=THEME['accent_red']) # 폰트 키움
+                )
+                st.plotly_chart(create_clean_chart(fig_eff), use_container_width=True)
+            else:
+                st.info("표시할 연비 데이터가 없습니다.")
+
         with col_row1_2:
             st.markdown('<div class="chart-header">주행 거리 추이</div>', unsafe_allow_html=True)
+            
             fig_dist = px.bar(chart_df, x='date', y='distance', labels=LABEL_MAP)
             fig_dist.update_traces(marker_color=THEME['accent_primary'], marker_line_width=0)
+            
+            # 추세선(이동 평균선) 추가 (데이터가 3개 이상일 때만)
+            if len(chart_df) >= 3:
+                # 3구간 이동 평균 계산
+                trend_data = chart_df['distance'].rolling(window=3, min_periods=1, center=True).mean()
+                fig_dist.add_trace(go.Scatter(
+                    x=chart_df['date'], 
+                    y=trend_data, 
+                    mode='lines', 
+                    name='추세(Trend)', 
+                    line=dict(color='white', width=2, dash='dot') # 흰색 점선으로 추세 표시
+                ))
+            
             st.plotly_chart(create_clean_chart(fig_dist), use_container_width=True)
-
-        st.markdown("<br>", unsafe_allow_html=True) # 간격
 
         col_row2_1, col_row2_2 = st.columns(2)
 
@@ -362,17 +400,36 @@ def main():
                 x=chart_df['date'], y=chart_df['consumed_fuel'], name='소모량', fill='tozeroy', 
                 line=dict(color=THEME['accent_red'], width=2), fillcolor=f"rgba(242, 139, 130, 0.2)"
             ))
-            st.plotly_chart(create_clean_chart(fig_fuel), use_container_width=True)
+            
+            # 기본 차트 생성 후 레이아웃 업데이트
+            final_fig_fuel = create_clean_chart(fig_fuel)
+            
+            # 범례 위치를 우상단(기본)에서 좌상단으로 강제 이동
+            final_fig_fuel.update_layout(
+                legend=dict(
+                    orientation="h", 
+                    yanchor="top", y=1.1, # 차트 위쪽
+                    xanchor="left", x=0   # 왼쪽 정렬
+                )
+            )
+            st.plotly_chart(final_fig_fuel, use_container_width=True)
 
         with col_row2_2:
             st.markdown('<div class="chart-header">속도와 연비의 상관관계</div>', unsafe_allow_html=True)
             scatter_sample = filtered_df.sample(n=min(500, len(filtered_df))) if len(filtered_df) > 500 else filtered_df.copy()
+            
             if not scatter_sample.empty:
                 scatter_sample['distance'] = scatter_sample['distance'].fillna(0)
             
-            if not scatter_sample.empty and scatter_sample['speed'].notnull().any():
+            # 속도가 0보다 큰 데이터만 유효 데이터로 인정 (0인 데이터 제외)
+            valid_scatter = scatter_sample[
+                (scatter_sample['speed'].notnull()) & 
+                (scatter_sample['speed'] > 0)
+            ]
+
+            if not valid_scatter.empty:
                 fig_corr = px.scatter(
-                    scatter_sample, x='speed', y='fuel_efficiency',
+                    valid_scatter, x='speed', y='fuel_efficiency',
                     size='distance', 
                     labels=LABEL_MAP,
                     opacity=0.7
@@ -380,7 +437,7 @@ def main():
                 fig_corr.update_traces(marker=dict(color=THEME['accent_green'], line=dict(width=1, color=THEME['bg_sidebar'])))
                 st.plotly_chart(create_clean_chart(fig_corr), use_container_width=True)
             else:
-                st.info("데이터가 부족합니다.")
+                st.info("유효한 상관관계 데이터(속도 > 0)가 부족합니다.")
 
     # -------------------------------------------------------------------------
     # TAB 2: 차량별 비교 분석
