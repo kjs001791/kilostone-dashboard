@@ -35,6 +35,7 @@ services:
     # [Volume Bind Mount]
     # 소스 코드 및 데이터 파일 동기화 (Host Path : Container Path)
     volumes:
+      - .:/app
       - ./data:/app/data
     
     # [Network]
