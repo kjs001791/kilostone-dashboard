@@ -1,60 +1,32 @@
-altair==6.0.0
-annotated-types==0.7.0
-attrs==25.4.0
-blinker==1.9.0
-cachetools==6.2.4
-certifi==2026.1.4
-charset-normalizer==3.4.4
-click==8.3.1
-colorama==0.4.6
-et_xmlfile==2.0.0
-gitdb==4.0.12
-GitPython==3.1.46
-google-ai-generativelanguage==0.6.15
-google-api-core==2.29.0
-google-api-python-client==2.187.0
-google-auth==2.47.0
-google-auth-httplib2==0.3.0
-google-generativeai==0.8.6
-googleapis-common-protos==1.72.0
-grpcio==1.76.0
-grpcio-status==1.71.2
-httplib2==0.31.1
-idna==3.11
-Jinja2==3.1.6
-jsonschema==4.26.0
-jsonschema-specifications==2025.9.1
-MarkupSafe==3.0.3
-narwhals==2.15.0
-openpyxl==3.1.5
-packaging==25.0
-pillow==12.1.0
-plotly==6.5.1
-proto-plus==1.27.0
-protobuf==5.29.5
-pyasn1==0.6.1
-pyasn1_modules==0.4.2
-pydantic==2.12.5
-pydantic_core==2.41.5
-pydeck==0.9.1
-pyparsing==3.3.1
-python-dateutil==2.9.0.post0
-python-dotenv==1.2.1
-pytz==2025.2
-referencing==0.37.0
-requests==2.32.5
-rpds-py==0.30.0
-rsa==4.9.1
-six==1.17.0
-smmap==5.0.2
-streamlit==1.52.2
-tenacity==9.1.2
-toml==0.10.2
-tornado==6.5.4
-tqdm==4.67.1
-typing-inspection==0.4.2
-typing_extensions==4.15.0
-tzdata==2025.3
-uritemplate==4.2.0
-urllib3==2.6.3
-watchdog==6.0.0
+# --- [대시보드 프레임워크] ---
+streamlit           # 웹 대시보드 메인
+watchdog            # 코드 수정 시 자동 새로고침 기능
+
+# --- [데이터 처리 및 분석] ---
+pandas              # 데이터프레임 처리
+numpy               # 수치 계산
+pyarrow             # 대용량 데이터 처리 (Streamlit 필수 권장)
+openpyxl            # 엑셀 파일 읽기/쓰기
+et_xmlfile          # 엑셀 XML 지원
+
+# --- [데이터베이스 연결] ---
+# (코드에서 사용 중이므로 필수 추가)
+pymysql             # MySQL/MariaDB 연결 드라이버
+sqlalchemy          # ORM 및 DB 연결 관리
+
+# --- [시각화 (차트)] ---
+plotly              # 인터랙티브 차트
+altair              # 통계적 시각화
+pydeck              # 지도 및 3D 시각화 (선택 사항)
+pillow              # 이미지 처리
+
+# --- [구글 생성형 AI (Gemini)] ---
+google-generativeai # Gemini API 사용
+google-auth         # 구글 인증 관리
+google-api-python-client
+
+# --- [유틸리티 & 환경설정] ---
+python-dotenv       # .env 파일 로드 (API 키 관리)
+requests            # HTTP 요청 (API 호출 등)
+python-dateutil     # 날짜/시간 처리
+pytz                # 타임존 처리

@@ -2,9 +2,10 @@ version: '3.8'
 
 services:
   dashboard:
+    # [핵심 변경 1] 이미지를 다운받지 말고, 현재 폴더(.)의 Dockerfile로 직접 빌드하라
     build:
       context: .
-    image: kilostone-dashboard:aws-v1
+    image: kilostone-dashboard:aws-v1  # 로컬에서 관리할 이름 (도커 허브용 아님)
     container_name: kilostone_app
     restart: unless-stopped
     ports:
@@ -15,11 +16,12 @@ services:
       - db
     volumes:
       - ./data:/app/data
-    networks:
+    networks:  # [핵심 변경 2] 주석 해제 (DB와 연결 필수)
       - kilostone-network
+    # [핵심 변경 3] command: tail -f ... 삭제함 (Dockerfile의 CMD를 따르도록)
 
   db:
-    image: mariadb:10.6
+    image: mariadb:10.6  # [추천] 1GB 램 환경에서는 MySQL보다 훨씬 안정적임
     container_name: kilostone_db
     restart: unless-stopped
     environment:
@@ -31,7 +33,18 @@ services:
       - ./mysql:/var/lib/mysql
     networks:
       - kilostone-network
+    # 한글 깨짐 방지 설정
     command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+
+  watchtower:
+    image: containrrr/watchtower
+    container_name: watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: --interval 60 --cleanup
+    networks:
+      - kilostone-network
 
 networks:
   kilostone-network:

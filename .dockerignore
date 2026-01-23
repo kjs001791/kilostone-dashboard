@@ -1,5 +1,10 @@
-venv/
+# [핵심] DB 데이터 폴더 (이거 때문에 에러 난 것임)
+mysql/
+
+# 깃 관련 파일 (이미지에 필요 없음)
 .git/
+.gitignore
+
+# 파이썬 캐시 파일
 __pycache__/
-.env
-.DS_Store
+*.pyc
