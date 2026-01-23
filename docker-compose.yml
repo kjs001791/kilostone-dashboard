@@ -2,7 +2,9 @@ version: '3.8'
 
 services:
   dashboard:
-    image: kjs0017/kilostone-dashboard:latest
+    build:
+      context: .
+    image: kilostone-dashboard:aws-v1
     container_name: kilostone_app
     restart: unless-stopped
     ports:
@@ -13,9 +15,8 @@ services:
       - db
     volumes:
       - ./data:/app/data
-    # networks:
-    #  - kilostone-network
-    command: tail -f /dev/null
+    networks:
+      - kilostone-network
 
   db:
     image: mariadb:10.6
@@ -31,16 +32,6 @@ services:
     networks:
       - kilostone-network
     command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
-
-  watchtower:
-    image: containrrr/watchtower
-    container_name: watchtower
-    restart: unless-stopped
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    command: --interval 60 --cleanup
-    networks:
-      - kilostone-network
 
 networks:
   kilostone-network:
