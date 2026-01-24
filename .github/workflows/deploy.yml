@@ -16,29 +16,20 @@ jobs:
           key: ${{ secrets.KEY }}
           port: 22
           script: |
-            # 1. 프로젝트 폴더 확인 및 이동
-            mkdir -p ~/apps/kilostone-dashboard
+            # 1. 이동
             cd ~/apps/kilostone-dashboard
 
-            # 2. [강제 초기화] 깃 상태가 꼬였든 말든 강제로 최신화
-            # - 기존 .git이 깨졌을 경우를 대비해 다시 init
-            if [ ! -d ".git" ]; then
-              git init
-              git remote add origin https://github.com/kjs001791/kilostone-dashboard.git
-            fi
-            
-            # - 강제 fetch 및 reset (서버의 로컬 수정사항 폐기)
+            # 2. [소스 동기화] 무조건 깃허브 최신 코드로 덮어쓰기
+            # (지저분한 if문 삭제. 이미 git 폴더가 있다고 가정하는 게 정석입니다)
             git fetch --all
             git reset --hard origin/main
 
-            # 3. [빌드 에러 방지] 
-            # - dockerignore가 반영되려면 이 파일이 먼저 있어야 함 (git reset으로 확보됨)
-            
-            # 4. [완전 재배포] 
-            # - down: 기존 컨테이너 삭제
-            # - build --no-cache: 캐시 안 쓰고 처음부터 다시 빌드 (최신 코드 반영 필수)
-            docker compose down
-            docker compose up -d --build --force-recreate --no-cache
-            
+            # 3. [빌드] 실행과 빌드 분리 (여기에 --no-cache를 써야 함)
+            # 캐시를 안 써야 소스 변경사항이 확실히 이미지에 박힘
+            docker compose build --no-cache
+
+            # 4. [실행] 컨테이너 교체 (강제 재생성)
+            docker compose up -d --force-recreate
+
             # 5. 청소
             docker image prune -f
