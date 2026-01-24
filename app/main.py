@@ -253,8 +253,12 @@ def main():
     )
 
     # [3] 로그인 위젯 표시 (메인 화면 중앙에 뜸)
-    # 리턴값: name(이름), authentication_status(성공여부), username(ID)
-    name, authentication_status, username = authenticator.login('로그인', 'main')
+    authenticator.login('main')
+
+    # 금고(session_state)에서 값 꺼내오기
+    authentication_status = st.session_state.get('authentication_status')
+    name = st.session_state.get('name')
+    username = st.session_state.get('username')
 
     # [4] 로그인 상태에 따른 분기 처리
     if authentication_status is False:

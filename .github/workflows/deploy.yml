@@ -19,20 +19,30 @@ jobs:
           key: ${{ secrets.KEY }}
           port: 22
           script: |
-            # 1. 프로젝트 폴더로 이동
+            # 1. 안전장치: 프로젝트 폴더가 없으면 생성
             mkdir -p ~/apps/kilostone-dashboard
             cd ~/apps/kilostone-dashboard
-            
-            # 2. GitHub 파일과 동일하게 변경
+
+            # 2. [핵심] 깃 초기화 여부 확인 후 강제 동기화
+            if [ ! -d ".git" ]; then
+              # 깃 폴더가 없으면 아예 새로 클론 (현재 폴더에)
+              git clone . temp_repo
+              mv temp_repo/.git .
+              rm -rf temp_repo
+              git remote add origin https://github.com/${{ github.repository }}
+            fi
+
+            # 3. 무조건 깃허브 최신 코드로 강제 리셋 (수동 수정본 다 무시)
             git fetch --all
             git reset --hard origin/main
             git pull origin main
 
-            # 3. 권한 재설정 (혹시 모를 실행 권한 문제 해결)
-            chmod +x scripts/*.py 2>/dev/null || true
+            # 4. 설정 파일(config.yaml)이 날아갔을 경우를 대비해 복구 (선택사항, 백업해뒀다면)
+            # (이 부분은 config.yaml이 .gitignore에 있어서 git reset해도 안 지워짐. 안심하세요.)
 
-            # 4. 변경된 설정으로 다시 빌드하고 실행
-            docker compose up -d --build --remove-orphans
+            # 5. 컨테이너 강제 재배포
+            docker compose down
+            docker compose up -d --build --force-recreate --remove-orphans
             
-            # 5. 빌드 과정에서 생긴 쓰레기 이미지 삭제
+            # 6. 불필요한 이미지 청소
             docker image prune -f
