@@ -249,8 +249,7 @@ def main():
         config['credentials'],
         config['cookie']['name'],
         config['cookie']['key'],
-        config['cookie']['expiry_days'],
-        config['preauthorized']
+        config['cookie']['expiry_days']
     )
 
     # [3] 로그인 위젯 표시 (메인 화면 중앙에 뜸)
@@ -276,7 +275,7 @@ def main():
             st.write(f"환영합니다, **{name}**님!")
             authenticator.logout('로그아웃', 'sidebar') # 로그아웃 버튼
             st.divider()    
-                
+
             df = load_data()
             if df.empty:
                 st.warning("데이터가 없습니다.")
