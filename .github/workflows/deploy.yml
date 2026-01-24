@@ -8,9 +8,6 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -19,30 +16,29 @@ jobs:
           key: ${{ secrets.KEY }}
           port: 22
           script: |
-            # 1. 안전장치: 프로젝트 폴더가 없으면 생성
+            # 1. 프로젝트 폴더 확인 및 이동
             mkdir -p ~/apps/kilostone-dashboard
             cd ~/apps/kilostone-dashboard
 
-            # 2. [핵심] 깃 초기화 여부 확인 후 강제 동기화
+            # 2. [강제 초기화] 깃 상태가 꼬였든 말든 강제로 최신화
+            # - 기존 .git이 깨졌을 경우를 대비해 다시 init
             if [ ! -d ".git" ]; then
-              # 깃 폴더가 없으면 아예 새로 클론 (현재 폴더에)
-              git clone . temp_repo
-              mv temp_repo/.git .
-              rm -rf temp_repo
-              git remote add origin https://github.com/${{ github.repository }}
+              git init
+              git remote add origin https://github.com/kjs001791/kilostone-dashboard.git
             fi
-
-            # 3. 무조건 깃허브 최신 코드로 강제 리셋 (수동 수정본 다 무시)
+            
+            # - 강제 fetch 및 reset (서버의 로컬 수정사항 폐기)
             git fetch --all
             git reset --hard origin/main
-            git pull origin main
 
-            # 4. 설정 파일(config.yaml)이 날아갔을 경우를 대비해 복구 (선택사항, 백업해뒀다면)
-            # (이 부분은 config.yaml이 .gitignore에 있어서 git reset해도 안 지워짐. 안심하세요.)
-
-            # 5. 컨테이너 강제 재배포
-            docker compose down
-            docker compose up -d --build --force-recreate --remove-orphans
+            # 3. [빌드 에러 방지] 
+            # - dockerignore가 반영되려면 이 파일이 먼저 있어야 함 (git reset으로 확보됨)
             
-            # 6. 불필요한 이미지 청소
+            # 4. [완전 재배포] 
+            # - down: 기존 컨테이너 삭제
+            # - build --no-cache: 캐시 안 쓰고 처음부터 다시 빌드 (최신 코드 반영 필수)
+            docker compose down
+            docker compose up -d --build --force-recreate --no-cache
+            
+            # 5. 청소
             docker image prune -f
