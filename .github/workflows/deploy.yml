@@ -22,11 +22,12 @@ jobs:
             # 1. 프로젝트 폴더로 이동
             cd ~/apps/kilostone-dashboard
             
-            # 2. 최신 코드 내려받기
-            git pull origin main
+            # 2. GitHub 파일과 동일하게 변경
+            git fetch --all
+            git reset --hard origin/main
             
             # 3. 변경된 설정으로 다시 빌드하고 실행
             docker compose up -d --build
             
-            # 4. (선택) 빌드 과정에서 생긴 쓰레기 이미지 삭제
+            # 4. 빌드 과정에서 생긴 쓰레기 이미지 삭제
             docker image prune -f

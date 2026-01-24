@@ -19,9 +19,11 @@ services:
     
     # [Port Mapping]
     # Host Port : Container Port (외부 8501 요청을 컨테이너 8501로 포워딩)
-    ports:
-      - "8501:8501"
+    # ports:
+    #  - "8501:8501
     
+    expose:
+      - "8501"
     # [Environment Variables]
     # 민감 정보(Credentials) 및 환경 설정을 .env 파일로부터 주입
     env_file:
@@ -72,6 +74,23 @@ services:
     # [Character Set]
     # 한글 데이터 처리를 위한 UTF-8(mb4) 인코딩 강제 설정
     command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+
+  # ----------------------------------------------------------------
+  # SSL and Domain Manager
+  # ----------------------------------------------------------------
+  nginx-proxy-manager:
+    image: 'jc21/nginx-proxy-manager:latest'
+    container_name: nginx_proxy_manager
+    restart: unless-stopped
+    ports:
+      - '80:80'      # http 접속용
+      - '81:81'      # 관리자 페이지용
+      - '443:443'    # https(SSL) 접속용
+    volumes:
+      - ./data-npm:/data
+      - ./letsencrypt:/etc/letsencrypt
+    networks:
+      - kilostone-network
 
 # ----------------------------------------------------------------
 # [Network Infrastructure]
