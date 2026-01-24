@@ -20,14 +20,19 @@ jobs:
           port: 22
           script: |
             # 1. 프로젝트 폴더로 이동
+            mkdir -p ~/apps/kilostone-dashboard
             cd ~/apps/kilostone-dashboard
             
             # 2. GitHub 파일과 동일하게 변경
             git fetch --all
             git reset --hard origin/main
+            git pull origin main
+
+            # 3. 권한 재설정 (혹시 모를 실행 권한 문제 해결)
+            chmod +x scripts/*.py 2>/dev/null || true
+
+            # 4. 변경된 설정으로 다시 빌드하고 실행
+            docker compose up -d --build --remove-orphans
             
-            # 3. 변경된 설정으로 다시 빌드하고 실행
-            docker compose up -d --build
-            
-            # 4. 빌드 과정에서 생긴 쓰레기 이미지 삭제
+            # 5. 빌드 과정에서 생긴 쓰레기 이미지 삭제
             docker image prune -f
