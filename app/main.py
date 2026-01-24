@@ -1,4 +1,7 @@
 import streamlit as st
+import streamlit_authenticator as stauth
+import yaml
+from yaml.loader import SafeLoader
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -230,255 +233,295 @@ def create_clean_chart(fig, height=300):
 # 5. 메인 로직
 # -----------------------------------------------------------------------------
 def main():
-    with st.sidebar:
-        st.markdown('<p class="logo-text">KILOSTONE</p>', unsafe_allow_html=True)
-        
-        df = load_data()
-        
-        if df.empty:
-            st.warning("데이터가 없습니다.")
-            return
-
-        st.markdown(f"<p style='color:{THEME['text_main']}; font-weight:500; margin-top:20px;'>기간 설정</p>", unsafe_allow_html=True)
-        min_date, max_date = df['date'].min().date(), df['date'].max().date()
-        date_range = st.date_input("", value=(min_date, max_date), min_value=min_date, max_value=max_date, label_visibility="collapsed")
-        
-        st.markdown(f"<br><p style='color:{THEME['text_main']}; font-weight:500;'>보기 방식</p>", unsafe_allow_html=True)
-        resample_option = st.radio("", ["일별 (Daily)", "주별 (Weekly)", "월별 (Monthly)"], index=1, label_visibility="collapsed")
-        
-        st.divider()
-        st.markdown(f"<div style='text-align:center; color:{THEME['text_sub']}; font-size:12px;'>Connected to Server</div>", unsafe_allow_html=True)
-
-        if isinstance(date_range, tuple) and len(date_range) == 2:
-            start, end = date_range
-            filtered_df = df[(df['date'].dt.date >= start) & (df['date'].dt.date <= end)]
-            selected_days = (end - start).days + 1
-        else:
-            filtered_df = df
-            selected_days = 1
-
-    # --- Main Content ---
-    # 헤더 제거하고 바로 탭으로 시작하여 공간 효율 극대화
+    # [1] 설정 파일 로드 (config.yaml)
+    # config.yaml 파일 위치가 프로젝트 루트인지 확인 필요
+    config_path = os.path.join(project_root, 'config.yaml')
     
-    # 탭 메뉴
-    tab1, tab2 = st.tabs(["전체 운행 현황", "차량별 비교 분석"])
+    try:
+        with open(config_path) as file:
+            config = yaml.load(file, Loader=SafeLoader)
+    except FileNotFoundError:
+        st.error("config.yaml 파일을 찾을 수 없습니다.")
+        return
 
-    # -------------------------------------------------------------------------
-    # TAB 1: 전체 운행 현황
-    # -------------------------------------------------------------------------
-    with tab1:
-        # 데이터 리샘플링
-        chart_df = filtered_df.copy()
-        if "주별" in resample_option:
-            chart_df = chart_df.resample('W-MON', on='date').mean(numeric_only=True).reset_index()
-        elif "월별" in resample_option:
-            chart_df = chart_df.resample('M', on='date').mean(numeric_only=True).reset_index()
+    # [2] 인증 객체 생성
+    authenticator = stauth.Authenticate(
+        config['credentials'],
+        config['cookie']['name'],
+        config['cookie']['key'],
+        config['cookie']['expiry_days'],
+        config['preauthorized']
+    )
 
-        # --- KPI Section (Streamlit Native Container 사용 - 반응형 완벽 지원) ---
-        # 억지로 높이를 맞추지 않고 내용물에 따라 늘어나게 함
-        st.markdown("<br>", unsafe_allow_html=True) # 상단 여백
-        
-        kpi_col1, kpi_col2, kpi_col3, kpi_col4 = st.columns(4)
-        
-        # KPI 렌더링 함수 (Native Container 안에 HTML 주입)
-        def render_kpi(container, title, value, delta_val=None, delta_suffix=""):
-            with container:
-                # [중요] border=True 옵션 사용: Streamlit이 알아서 크기 조절해주는 박스 생성
-                with st.container(border=True):
-                    delta_html = ""
-                    if delta_val is not None:
-                        color = THEME['accent_green'] if delta_val >= 0 else THEME['accent_red']
-                        sign = "▲" if delta_val >= 0 else "▼"
-                        delta_html = f"<span style='color:{color}'>{sign} {abs(delta_val):.2f}{delta_suffix}</span>"
-                    
-                    st.markdown(f"""
-                        <div class="kpi-title">{title}</div>
-                        <div class="kpi-value">{value}</div>
-                        <div class="kpi-delta">{delta_html}</div>
-                    """, unsafe_allow_html=True)
+    # [3] 로그인 위젯 표시 (메인 화면 중앙에 뜸)
+    # 리턴값: name(이름), authentication_status(성공여부), username(ID)
+    name, authentication_status, username = authenticator.login('로그인', 'main')
 
-        # KPI 계산
-        total_days = (df['date'].max() - df['date'].min()).days + 1
-        avg_daily_dist_all = df['distance'].sum() / total_days
-        curr_daily_dist = filtered_df['distance'].sum() / selected_days
-        
-        avg_daily_time_all = df['time'].sum() / total_days
-        curr_daily_time = filtered_df['time'].sum() / selected_days
-        
-        avg_daily_fuel_all = df['consumed_fuel'].sum() / total_days
-        curr_daily_fuel = filtered_df['consumed_fuel'].sum() / selected_days
+    # [4] 로그인 상태에 따른 분기 처리
+    if authentication_status is False:
+        st.error('아이디 또는 비밀번호가 틀렸습니다.')
+        return  # 더 이상 코드 실행 안 함
 
-        # KPI 1: 평균 연비
-        current_eff = filtered_df['fuel_efficiency'].mean()
-        delta_eff = current_eff - df['fuel_efficiency'].mean()
-        render_kpi(kpi_col1, "평균 연비", f"{current_eff:.2f} km/L", delta_eff)
+    elif authentication_status is None:
+        st.warning('아이디와 비밀번호를 입력해주세요.')
+        return  # 더 이상 코드 실행 안 함
 
-        # KPI 2: 총 주행 거리
-        delta_dist = curr_daily_dist - avg_daily_dist_all
-        render_kpi(kpi_col2, "총 주행 거리", f"{filtered_df['distance'].sum():,.0f} km", delta_dist)
-
-        # KPI 3: 총 운행 시간
-        total_minutes = filtered_df['time'].sum()
-        if total_minutes > 60:
-            time_str = f"{int(total_minutes // 60):,}시간" # 예: 11,432시간
-        else:
-            time_str = f"{int(total_minutes)}분"
-        delta_time = curr_daily_time - avg_daily_time_all
-        render_kpi(kpi_col3, "총 운행 시간", time_str, delta_time)
-
-        # KPI 4: 총 연료 소모량
-        delta_fuel = curr_daily_fuel - avg_daily_fuel_all
-        render_kpi(kpi_col4, "총 연료 소모량", f"{filtered_df['consumed_fuel'].sum():,.0f} L", delta_fuel)
-
-        st.divider() # 구분선
-
-        # --- Charts Section (박스 없이 깔끔하게 배치) ---
-        
-        col_row1_1, col_row1_2 = st.columns(2)
-
-        with col_row1_1:
-            st.markdown('<div class="chart-header">연비 추이</div>', unsafe_allow_html=True)
-            
-            # 연비가 0보다 큰 데이터만 필터링하여 저장
-            valid_eff_df = chart_df[chart_df['fuel_efficiency'] > 0]
-            
-            # 데이터가 존재하는 경우에만 시각화
-            if not valid_eff_df.empty:
-                fig_eff = px.line(valid_eff_df, x='date', y='fuel_efficiency', labels=LABEL_MAP, markers=True if len(valid_eff_df) < 50 else False)
-                fig_eff.update_traces(line_color=THEME['accent_green'], line_width=3)
+    # =========================================================================
+    # [5] 로그인 성공 시에만 실행되는 영역 (기존 대시보드 코드)
+    # =========================================================================
+    elif authentication_status:
+        # 사이드바에 로그아웃 버튼과 환영 메시지 표시
+        with st.sidebar:
+            st.markdown('<p class="logo-text">KILOSTONE</p>', unsafe_allow_html=True)
+            st.write(f"환영합니다, **{name}**님!")
+            authenticator.logout('로그아웃', 'sidebar') # 로그아웃 버튼
+            st.divider()    
                 
-                # 평균선 강조 및 수치 표시
-                avg_eff = valid_eff_df['fuel_efficiency'].mean()
-                fig_eff.add_hline(
-                    y=avg_eff, 
-                    line_dash="dash", 
-                    line_color=THEME['accent_red'], # 눈에 띄는 색(빨강)으로 변경
-                    line_width=2,
-                    annotation_text=f"평균: {avg_eff:.2f} km/L", # 값 직접 표시
-                    annotation_position="top left",
-                    annotation_font=dict(size=14, color=THEME['accent_red']) # 폰트 키움
-                )
-                st.plotly_chart(create_clean_chart(fig_eff), use_container_width=True)
-            else:
-                st.info("표시할 연비 데이터가 없습니다.")
+            df = load_data()
+            if df.empty:
+                st.warning("데이터가 없습니다.")
+                return
 
-        with col_row1_2:
-            st.markdown('<div class="chart-header">주행 거리 추이</div>', unsafe_allow_html=True)
+            st.markdown(f"<p style='color:{THEME['text_main']}; font-weight:500; margin-top:20px;'>기간 설정</p>", unsafe_allow_html=True)
+            min_date, max_date = df['date'].min().date(), df['date'].max().date()
+            date_range = st.date_input("", value=(min_date, max_date), min_value=min_date, max_value=max_date, label_visibility="collapsed")
             
-            fig_dist = px.bar(chart_df, x='date', y='distance', labels=LABEL_MAP)
-            fig_dist.update_traces(marker_color=THEME['accent_primary'], marker_line_width=0)
+            st.markdown(f"<br><p style='color:{THEME['text_main']}; font-weight:500;'>보기 방식</p>", unsafe_allow_html=True)
+            resample_option = st.radio("", ["일별 (Daily)", "주별 (Weekly)", "월별 (Monthly)"], index=1, label_visibility="collapsed")
             
-            # 추세선(이동 평균선) 추가 (데이터가 3개 이상일 때만)
-            if len(chart_df) >= 3:
-                # 3구간 이동 평균 계산
-                trend_data = chart_df['distance'].rolling(window=3, min_periods=1, center=True).mean()
-                fig_dist.add_trace(go.Scatter(
-                    x=chart_df['date'], 
-                    y=trend_data, 
-                    mode='lines', 
-                    name='추세(Trend)', 
-                    line=dict(color='white', width=2, dash='dot') # 흰색 점선으로 추세 표시
+            st.divider()
+            st.markdown(f"<div style='text-align:center; color:{THEME['text_sub']}; font-size:12px;'>Connected to Server</div>", unsafe_allow_html=True)
+
+            if isinstance(date_range, tuple) and len(date_range) == 2:
+                start, end = date_range
+                filtered_df = df[(df['date'].dt.date >= start) & (df['date'].dt.date <= end)]
+                selected_days = (end - start).days + 1
+            else:
+                filtered_df = df
+                selected_days = 1
+
+        # --- Main Content ---
+        # 헤더 제거하고 바로 탭으로 시작하여 공간 효율 극대화
+        
+        # 탭 메뉴
+        tab1, tab2 = st.tabs(["전체 운행 현황", "차량별 비교 분석"])
+
+        # -------------------------------------------------------------------------
+        # TAB 1: 전체 운행 현황
+        # -------------------------------------------------------------------------
+        with tab1:
+            # 데이터 리샘플링
+            chart_df = filtered_df.copy()
+            if "주별" in resample_option:
+                chart_df = chart_df.resample('W-MON', on='date').mean(numeric_only=True).reset_index()
+            elif "월별" in resample_option:
+                chart_df = chart_df.resample('M', on='date').mean(numeric_only=True).reset_index()
+
+            # --- KPI Section (Streamlit Native Container 사용 - 반응형 완벽 지원) ---
+            # 억지로 높이를 맞추지 않고 내용물에 따라 늘어나게 함
+            st.markdown("<br>", unsafe_allow_html=True) # 상단 여백
+            
+            kpi_col1, kpi_col2, kpi_col3, kpi_col4 = st.columns(4)
+            
+            # KPI 렌더링 함수 (Native Container 안에 HTML 주입)
+            def render_kpi(container, title, value, delta_val=None, delta_suffix=""):
+                with container:
+                    # [중요] border=True 옵션 사용: Streamlit이 알아서 크기 조절해주는 박스 생성
+                    with st.container(border=True):
+                        delta_html = ""
+                        if delta_val is not None:
+                            color = THEME['accent_green'] if delta_val >= 0 else THEME['accent_red']
+                            sign = "▲" if delta_val >= 0 else "▼"
+                            delta_html = f"<span style='color:{color}'>{sign} {abs(delta_val):.2f}{delta_suffix}</span>"
+                        
+                        st.markdown(f"""
+                            <div class="kpi-title">{title}</div>
+                            <div class="kpi-value">{value}</div>
+                            <div class="kpi-delta">{delta_html}</div>
+                        """, unsafe_allow_html=True)
+
+            # KPI 계산
+            total_days = (df['date'].max() - df['date'].min()).days + 1
+            avg_daily_dist_all = df['distance'].sum() / total_days
+            curr_daily_dist = filtered_df['distance'].sum() / selected_days
+            
+            avg_daily_time_all = df['time'].sum() / total_days
+            curr_daily_time = filtered_df['time'].sum() / selected_days
+            
+            avg_daily_fuel_all = df['consumed_fuel'].sum() / total_days
+            curr_daily_fuel = filtered_df['consumed_fuel'].sum() / selected_days
+
+            # KPI 1: 평균 연비
+            current_eff = filtered_df['fuel_efficiency'].mean()
+            delta_eff = current_eff - df['fuel_efficiency'].mean()
+            render_kpi(kpi_col1, "평균 연비", f"{current_eff:.2f} km/L", delta_eff)
+
+            # KPI 2: 총 주행 거리
+            delta_dist = curr_daily_dist - avg_daily_dist_all
+            render_kpi(kpi_col2, "총 주행 거리", f"{filtered_df['distance'].sum():,.0f} km", delta_dist)
+
+            # KPI 3: 총 운행 시간
+            total_minutes = filtered_df['time'].sum()
+            if total_minutes > 60:
+                time_str = f"{int(total_minutes // 60):,}시간" # 예: 11,432시간
+            else:
+                time_str = f"{int(total_minutes)}분"
+            delta_time = curr_daily_time - avg_daily_time_all
+            render_kpi(kpi_col3, "총 운행 시간", time_str, delta_time)
+
+            # KPI 4: 총 연료 소모량
+            delta_fuel = curr_daily_fuel - avg_daily_fuel_all
+            render_kpi(kpi_col4, "총 연료 소모량", f"{filtered_df['consumed_fuel'].sum():,.0f} L", delta_fuel)
+
+            st.divider() # 구분선
+
+            # --- Charts Section (박스 없이 깔끔하게 배치) ---
+            
+            col_row1_1, col_row1_2 = st.columns(2)
+
+            with col_row1_1:
+                st.markdown('<div class="chart-header">연비 추이</div>', unsafe_allow_html=True)
+                
+                # 연비가 0보다 큰 데이터만 필터링하여 저장
+                valid_eff_df = chart_df[chart_df['fuel_efficiency'] > 0]
+                
+                # 데이터가 존재하는 경우에만 시각화
+                if not valid_eff_df.empty:
+                    fig_eff = px.line(valid_eff_df, x='date', y='fuel_efficiency', labels=LABEL_MAP, markers=True if len(valid_eff_df) < 50 else False)
+                    fig_eff.update_traces(line_color=THEME['accent_green'], line_width=3)
+                    
+                    # 평균선 강조 및 수치 표시
+                    avg_eff = valid_eff_df['fuel_efficiency'].mean()
+                    fig_eff.add_hline(
+                        y=avg_eff, 
+                        line_dash="dash", 
+                        line_color=THEME['accent_red'], # 눈에 띄는 색(빨강)으로 변경
+                        line_width=2,
+                        annotation_text=f"평균: {avg_eff:.2f} km/L", # 값 직접 표시
+                        annotation_position="top left",
+                        annotation_font=dict(size=14, color=THEME['accent_red']) # 폰트 키움
+                    )
+                    st.plotly_chart(create_clean_chart(fig_eff), use_container_width=True)
+                else:
+                    st.info("표시할 연비 데이터가 없습니다.")
+
+            with col_row1_2:
+                st.markdown('<div class="chart-header">주행 거리 추이</div>', unsafe_allow_html=True)
+                
+                fig_dist = px.bar(chart_df, x='date', y='distance', labels=LABEL_MAP)
+                fig_dist.update_traces(marker_color=THEME['accent_primary'], marker_line_width=0)
+                
+                # 추세선(이동 평균선) 추가 (데이터가 3개 이상일 때만)
+                if len(chart_df) >= 3:
+                    # 3구간 이동 평균 계산
+                    trend_data = chart_df['distance'].rolling(window=3, min_periods=1, center=True).mean()
+                    fig_dist.add_trace(go.Scatter(
+                        x=chart_df['date'], 
+                        y=trend_data, 
+                        mode='lines', 
+                        name='추세(Trend)', 
+                        line=dict(color='white', width=2, dash='dot') # 흰색 점선으로 추세 표시
+                    ))
+                
+                st.plotly_chart(create_clean_chart(fig_dist), use_container_width=True)
+
+            col_row2_1, col_row2_2 = st.columns(2)
+
+            with col_row2_1:
+                st.markdown('<div class="chart-header">주유량 대비 연료 소모량</div>', unsafe_allow_html=True)
+                fig_fuel = go.Figure()
+                fig_fuel.add_trace(go.Bar(x=chart_df['date'], y=chart_df['refuel'], name='주유량', marker_color=THEME['accent_yellow'], opacity=0.8))
+                fig_fuel.add_trace(go.Scatter(
+                    x=chart_df['date'], y=chart_df['consumed_fuel'], name='소모량', fill='tozeroy', 
+                    line=dict(color=THEME['accent_red'], width=2), fillcolor=f"rgba(242, 139, 130, 0.2)"
                 ))
-            
-            st.plotly_chart(create_clean_chart(fig_dist), use_container_width=True)
-
-        col_row2_1, col_row2_2 = st.columns(2)
-
-        with col_row2_1:
-            st.markdown('<div class="chart-header">주유량 대비 연료 소모량</div>', unsafe_allow_html=True)
-            fig_fuel = go.Figure()
-            fig_fuel.add_trace(go.Bar(x=chart_df['date'], y=chart_df['refuel'], name='주유량', marker_color=THEME['accent_yellow'], opacity=0.8))
-            fig_fuel.add_trace(go.Scatter(
-                x=chart_df['date'], y=chart_df['consumed_fuel'], name='소모량', fill='tozeroy', 
-                line=dict(color=THEME['accent_red'], width=2), fillcolor=f"rgba(242, 139, 130, 0.2)"
-            ))
-            
-            # 기본 차트 생성 후 레이아웃 업데이트
-            final_fig_fuel = create_clean_chart(fig_fuel)
-            
-            # 범례 위치를 우상단(기본)에서 좌상단으로 강제 이동
-            final_fig_fuel.update_layout(
-                legend=dict(
-                    orientation="h", 
-                    yanchor="top", y=1.1, # 차트 위쪽
-                    xanchor="left", x=0   # 왼쪽 정렬
+                
+                # 기본 차트 생성 후 레이아웃 업데이트
+                final_fig_fuel = create_clean_chart(fig_fuel)
+                
+                # 범례 위치를 우상단(기본)에서 좌상단으로 강제 이동
+                final_fig_fuel.update_layout(
+                    legend=dict(
+                        orientation="h", 
+                        yanchor="top", y=1.1, # 차트 위쪽
+                        xanchor="left", x=0   # 왼쪽 정렬
+                    )
                 )
-            )
-            st.plotly_chart(final_fig_fuel, use_container_width=True)
+                st.plotly_chart(final_fig_fuel, use_container_width=True)
 
-        with col_row2_2:
-            st.markdown('<div class="chart-header">속도와 연비의 상관관계</div>', unsafe_allow_html=True)
-            scatter_sample = filtered_df.sample(n=min(500, len(filtered_df))) if len(filtered_df) > 500 else filtered_df.copy()
-            
-            if not scatter_sample.empty:
-                scatter_sample['distance'] = scatter_sample['distance'].fillna(0)
-            
-            # 속도가 0보다 큰 데이터만 유효 데이터로 인정 (0인 데이터 제외)
-            valid_scatter = scatter_sample[
-                (scatter_sample['speed'].notnull()) & 
-                (scatter_sample['speed'] > 0)
-            ]
+            with col_row2_2:
+                st.markdown('<div class="chart-header">속도와 연비의 상관관계</div>', unsafe_allow_html=True)
+                scatter_sample = filtered_df.sample(n=min(500, len(filtered_df))) if len(filtered_df) > 500 else filtered_df.copy()
+                
+                if not scatter_sample.empty:
+                    scatter_sample['distance'] = scatter_sample['distance'].fillna(0)
+                
+                # 속도가 0보다 큰 데이터만 유효 데이터로 인정 (0인 데이터 제외)
+                valid_scatter = scatter_sample[
+                    (scatter_sample['speed'].notnull()) & 
+                    (scatter_sample['speed'] > 0)
+                ]
 
-            if not valid_scatter.empty:
-                fig_corr = px.scatter(
-                    valid_scatter, x='speed', y='fuel_efficiency',
-                    size='distance', 
+                if not valid_scatter.empty:
+                    fig_corr = px.scatter(
+                        valid_scatter, x='speed', y='fuel_efficiency',
+                        size='distance', 
+                        labels=LABEL_MAP,
+                        opacity=0.7
+                    )
+                    fig_corr.update_traces(marker=dict(color=THEME['accent_green'], line=dict(width=1, color=THEME['bg_sidebar'])))
+                    st.plotly_chart(create_clean_chart(fig_corr), use_container_width=True)
+                else:
+                    st.info("유효한 상관관계 데이터(속도 > 0)가 부족합니다.")
+
+        # -------------------------------------------------------------------------
+        # TAB 2: 차량별 비교 분석
+        # -------------------------------------------------------------------------
+        with tab2:
+            st.markdown("<br>", unsafe_allow_html=True)
+            vehicle_group = filtered_df.groupby('vehicle_id').agg({
+                'distance': 'sum',
+                'fuel_efficiency': 'mean',
+                'consumed_fuel': 'sum',
+                'time': 'sum'
+            }).reset_index()
+
+            c_v1, c_v2 = st.columns(2)
+            with c_v1:
+                st.markdown('<div class="chart-header">차량별 총 주행 거리</div>', unsafe_allow_html=True)
+                fig_v_dist = px.bar(
+                    vehicle_group, x='vehicle_id', y='distance',
+                    color='vehicle_id',
                     labels=LABEL_MAP,
-                    opacity=0.7
+                    text_auto='.2s'
                 )
-                fig_corr.update_traces(marker=dict(color=THEME['accent_green'], line=dict(width=1, color=THEME['bg_sidebar'])))
-                st.plotly_chart(create_clean_chart(fig_corr), use_container_width=True)
-            else:
-                st.info("유효한 상관관계 데이터(속도 > 0)가 부족합니다.")
+                fig_v_dist.update_traces(textfont_size=12, textangle=0, textposition="outside", cliponaxis=False)
+                st.plotly_chart(create_clean_chart(fig_v_dist), use_container_width=True)
 
-    # -------------------------------------------------------------------------
-    # TAB 2: 차량별 비교 분석
-    # -------------------------------------------------------------------------
-    with tab2:
-        st.markdown("<br>", unsafe_allow_html=True)
-        vehicle_group = filtered_df.groupby('vehicle_id').agg({
-            'distance': 'sum',
-            'fuel_efficiency': 'mean',
-            'consumed_fuel': 'sum',
-            'time': 'sum'
-        }).reset_index()
+            with c_v2:
+                st.markdown('<div class="chart-header">차량별 평균 연비</div>', unsafe_allow_html=True)
+                fig_v_eff = px.bar(
+                    vehicle_group, x='vehicle_id', y='fuel_efficiency',
+                    color='vehicle_id',
+                    labels=LABEL_MAP,
+                    text_auto='.2f'
+                )
+                avg_all_eff = vehicle_group['fuel_efficiency'].mean()
+                fig_v_eff.add_hline(y=avg_all_eff, line_dash="dot", line_color=THEME['text_sub'], annotation_text="전체 평균")
+                st.plotly_chart(create_clean_chart(fig_v_eff), use_container_width=True)
 
-        c_v1, c_v2 = st.columns(2)
-        with c_v1:
-            st.markdown('<div class="chart-header">차량별 총 주행 거리</div>', unsafe_allow_html=True)
-            fig_v_dist = px.bar(
-                vehicle_group, x='vehicle_id', y='distance',
-                color='vehicle_id',
-                labels=LABEL_MAP,
-                text_auto='.2s'
+            # 차량별 상세 데이터 (박스 없음)
+            st.markdown('<div class="chart-header">차량별 상세 데이터</div>', unsafe_allow_html=True)
+            st.dataframe(
+                vehicle_group.rename(columns=LABEL_MAP).sort_values(by='주행 거리 (km)', ascending=False),
+                use_container_width=True
             )
-            fig_v_dist.update_traces(textfont_size=12, textangle=0, textposition="outside", cliponaxis=False)
-            st.plotly_chart(create_clean_chart(fig_v_dist), use_container_width=True)
 
-        with c_v2:
-            st.markdown('<div class="chart-header">차량별 평균 연비</div>', unsafe_allow_html=True)
-            fig_v_eff = px.bar(
-                vehicle_group, x='vehicle_id', y='fuel_efficiency',
-                color='vehicle_id',
-                labels=LABEL_MAP,
-                text_auto='.2f'
-            )
-            avg_all_eff = vehicle_group['fuel_efficiency'].mean()
-            fig_v_eff.add_hline(y=avg_all_eff, line_dash="dot", line_color=THEME['text_sub'], annotation_text="전체 평균")
-            st.plotly_chart(create_clean_chart(fig_v_eff), use_container_width=True)
-
-        # 차량별 상세 데이터 (박스 없음)
-        st.markdown('<div class="chart-header">차량별 상세 데이터</div>', unsafe_allow_html=True)
-        st.dataframe(
-            vehicle_group.rename(columns=LABEL_MAP).sort_values(by='주행 거리 (km)', ascending=False),
-            use_container_width=True
-        )
-
-    # 공통: 하단 원본 데이터 로그
-    st.divider()
-    with st.expander("📋 전체 로그 데이터 확인하기", expanded=True):
-        display_df = filtered_df.rename(columns=LABEL_MAP).sort_values(by='날짜', ascending=False)
-        st.dataframe(display_df, use_container_width=True, height=400)
+        # 공통: 하단 원본 데이터 로그
+        st.divider()
+        with st.expander("📋 전체 로그 데이터 확인하기", expanded=True):
+            display_df = filtered_df.rename(columns=LABEL_MAP).sort_values(by='날짜', ascending=False)
+            st.dataframe(display_df, use_container_width=True, height=400)
 
 if __name__ == "__main__":
     main()
