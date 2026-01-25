@@ -37,8 +37,8 @@ services:
     # [Volume Bind Mount]
     # 소스 코드 및 데이터 파일 동기화 (Host Path : Container Path)
     volumes:
-      - .:/app
       - ./data:/app/data
+      - ./config.yaml:/app/config.yaml:ro
     
     # [Network]
     # 내부 서비스 간 통신을 위한 사용자 정의 브리지 네트워크 연결
