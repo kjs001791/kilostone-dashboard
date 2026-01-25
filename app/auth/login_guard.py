@@ -15,15 +15,28 @@ from config import MAX_LOGIN_ATTEMPTS, BLOCKED_USERS_FILE, LOGIN_ATTEMPTS_FILE
 def get_client_ip():
     """클라이언트 IP 주소 가져오기"""
     try:
-        from streamlit.runtime.scriptrunner import get_script_run_ctx
-        ctx = get_script_run_ctx()
-        if ctx is not None:
-            headers = st.context.headers if hasattr(st, 'context') else {}
-            ip = headers.get('X-Forwarded-For', headers.get('X-Real-Ip', 'unknown'))
-            if ip and ip != 'unknown':
-                return ip.split(',')[0].strip()
-    except:
-        pass
+        if hasattr(st, 'context') and hasattr(st.context, 'headers'):
+            headers = dict(st.context.headers)
+            
+            # 🔍 디버그: 모든 헤더 출력 (확인 후 삭제)
+            st.sidebar.write("📋 Headers:", headers)
+            
+            # 대소문자 무시하고 검색
+            for key, value in headers.items():
+                key_lower = key.lower()
+                if key_lower == 'x-forwarded-for':
+                    return value.split(',')[0].strip()
+                if key_lower == 'x-real-ip':
+                    return value.strip()
+            
+            # Host 헤더에서 IP 추출 시도 (최후의 수단)
+            host = headers.get('Host', '')
+            if host and not any(c.isalpha() for c in host.split(':')[0]):
+                return host.split(':')[0]
+                
+    except Exception as e:
+        st.sidebar.write(f"❌ Error: {e}")
+    
     return "unknown"
 
 
@@ -43,6 +56,8 @@ def _load_json(filepath, default=None):
 def _save_json(filepath, data):
     """JSON 파일 저장"""
     try:
+        # 디렉토리가 없으면 생성
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
         with open(filepath, 'w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
     except IOError as e:
@@ -53,7 +68,7 @@ def is_blocked(identifier):
     """차단 여부 확인"""
     blocked = _load_json(BLOCKED_USERS_FILE, {"blocked": []})
     for entry in blocked.get("blocked", []):
-        if entry.get("username") == identifier or entry.get("ip") == identifier:
+        if entry.get("ip") == identifier or entry.get("username") == identifier:
             return True
     return False
 
@@ -70,10 +85,6 @@ def increment_login_attempts(identifier, ip="unknown"):
     current = attempts.get(identifier, 0) + 1
     attempts[identifier] = current
     _save_json(LOGIN_ATTEMPTS_FILE, attempts)
-    
-    if current >= MAX_LOGIN_ATTEMPTS:
-        _block_user(identifier, ip)
-    
     return current
 
 
@@ -85,17 +96,18 @@ def reset_login_attempts(identifier):
         _save_json(LOGIN_ATTEMPTS_FILE, attempts)
 
 
-def _block_user(identifier, ip="unknown"):
+def block_user(identifier, ip="unknown"):
     """사용자/IP 차단"""
     blocked = _load_json(BLOCKED_USERS_FILE, {"blocked": []})
     
+    # 이미 차단되어 있는지 확인
     for entry in blocked["blocked"]:
-        if entry.get("username") == identifier:
+        if entry.get("ip") == identifier:
             return
     
     blocked["blocked"].append({
-        "username": identifier,
         "ip": ip,
+        "username": identifier,
         "blocked_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "reason": f"로그인 {MAX_LOGIN_ATTEMPTS}회 실패"
     })

@@ -10,8 +10,9 @@ PROJECT_ROOT = os.path.dirname(APP_DIR)
 # 파일 경로
 ICON_PATH = os.path.join(PROJECT_ROOT, 'assets', 'logo.ico')
 CONFIG_PATH = os.path.join(PROJECT_ROOT, 'config.yaml')
-BLOCKED_USERS_FILE = os.path.join(PROJECT_ROOT, 'blocked_users.json')
-LOGIN_ATTEMPTS_FILE = os.path.join(PROJECT_ROOT, 'login_attempts.json')
+DATA_DIR = os.path.join(PROJECT_ROOT, 'data')
+BLOCKED_USERS_FILE = os.path.join(DATA_DIR, 'blocked_users.json')
+LOGIN_ATTEMPTS_FILE = os.path.join(DATA_DIR, 'login_attempts.json')
 
 # 로그인 설정
 MAX_LOGIN_ATTEMPTS = 5
