@@ -20,9 +20,8 @@ jobs:
             cd ~/apps/kilostone-dashboard
 
             # 2. [소스 동기화] 무조건 깃허브 최신 코드로 덮어쓰기
-            # (지저분한 if문 삭제. 이미 git 폴더가 있다고 가정하는 게 정석입니다)
             git fetch --all
-            git reset --hard origin/main
+            git checkout -B main origin/main
 
             # 3. [빌드] 실행과 빌드 분리 (여기에 --no-cache를 써야 함)
             # 캐시를 안 써야 소스 변경사항이 확실히 이미지에 박힘
