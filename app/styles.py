@@ -1,7 +1,11 @@
 """
 Streamlit CSS 스타일 정의
 """
-from .config import THEME
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from config import THEME
 
 def get_css():
     """전체 CSS 스타일 반환"""

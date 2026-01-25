@@ -1,4 +1,4 @@
-from .login_guard import (
+from auth.login_guard import (
     get_client_ip,
     is_blocked,
     get_login_attempts,

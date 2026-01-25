@@ -6,11 +6,10 @@ import os
 from datetime import datetime
 import streamlit as st
 
-from ..config import (
-    MAX_LOGIN_ATTEMPTS, 
-    BLOCKED_USERS_FILE, 
-    LOGIN_ATTEMPTS_FILE
-)
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from config import MAX_LOGIN_ATTEMPTS, BLOCKED_USERS_FILE, LOGIN_ATTEMPTS_FILE
 
 
 def get_client_ip():

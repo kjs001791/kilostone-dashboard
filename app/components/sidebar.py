@@ -2,7 +2,11 @@
 사이드바 컴포넌트
 """
 import streamlit as st
-from ..config import THEME
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from config import THEME
 
 
 def render_sidebar(df, authenticator, name):

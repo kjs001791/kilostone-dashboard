@@ -5,21 +5,22 @@ import streamlit as st
 import streamlit_authenticator as stauth
 import yaml
 from yaml.loader import SafeLoader
+import sys
+import os
+
+# 경로 설정
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # 내부 모듈
 from config import ICON_PATH, CONFIG_PATH, THEME, LABEL_MAP, MAX_LOGIN_ATTEMPTS
 from styles import get_css
-from auth import (
+from auth.login_guard import (
     get_client_ip, is_blocked, get_login_attempts,
     increment_login_attempts, reset_login_attempts
 )
-from components import render_kpi, create_clean_chart
 from components.sidebar import render_sidebar
-from pages import render_overview_tab, render_vehicle_tab
-
-import sys
-import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from views.overview import render_overview_tab
+from views.vehicle import render_vehicle_tab
 from services.data_loader import load_data
 
 
@@ -43,7 +44,7 @@ st.markdown(get_css(), unsafe_allow_html=True)
 def main():
     # 설정 로드
     try:
-        with open(CONFIG_PATH) as file:
+        with open(CONFIG_PATH, encoding='utf-8') as file:
             config = yaml.load(file, Loader=SafeLoader)
     except FileNotFoundError:
         st.error("config.yaml 파일을 찾을 수 없습니다.")

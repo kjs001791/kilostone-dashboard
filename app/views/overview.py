@@ -4,9 +4,14 @@ TAB 1: 전체 운행 현황
 import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
+import sys
+import os
 
-from ..config import THEME, LABEL_MAP
-from ..components import create_clean_chart, render_kpi
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from config import THEME, LABEL_MAP
+from components.charts import create_clean_chart
+from components.kpi_cards import render_kpi
 
 
 def render_overview_tab(df, filtered_df, selected_days, resample_option):

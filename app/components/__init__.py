@@ -1,3 +1,3 @@
-from .charts import create_clean_chart
-from .kpi_cards import render_kpi
-from .sidebar import render_sidebar
+from components.charts import create_clean_chart
+from components.kpi_cards import render_kpi
+from components.sidebar import render_sidebar

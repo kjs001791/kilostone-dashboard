@@ -3,10 +3,13 @@ TAB 2: 차량별 비교 분석
 """
 import streamlit as st
 import plotly.express as px
+import sys
+import os
 
-from ..config import THEME, LABEL_MAP
-from ..components import create_clean_chart
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from config import THEME, LABEL_MAP
+from components.charts import create_clean_chart
 
 def render_vehicle_tab(filtered_df):
     """차량별 비교 분석 탭 렌더링"""

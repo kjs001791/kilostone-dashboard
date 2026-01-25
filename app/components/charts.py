@@ -1,7 +1,11 @@
 """
 Plotly 차트 스타일링 헬퍼
 """
-from ..config import THEME
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from config import THEME
 
 
 def create_clean_chart(fig, height=300):
