@@ -17,10 +17,7 @@ def get_client_ip():
     try:
         if hasattr(st, 'context') and hasattr(st.context, 'headers'):
             headers = dict(st.context.headers)
-            
-            # 🔍 디버그: 모든 헤더 출력 (확인 후 삭제)
-            st.sidebar.write("📋 Headers:", headers)
-            
+
             # 대소문자 무시하고 검색
             for key, value in headers.items():
                 key_lower = key.lower()
