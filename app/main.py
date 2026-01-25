@@ -22,6 +22,111 @@ project_root = os.path.dirname(current_dir)
 icon_path = os.path.join(project_root, 'assets', 'logo.ico')
 
 # -----------------------------------------------------------------------------
+# 🔒 로그인 시도 제한 설정
+# -----------------------------------------------------------------------------
+MAX_LOGIN_ATTEMPTS = 5  # 최대 시도 횟수
+BLOCKED_USERS_FILE = os.path.join(project_root, 'blocked_users.json')
+LOGIN_ATTEMPTS_FILE = os.path.join(project_root, 'login_attempts.json')
+
+# -----------------------------------------------------------------------------
+# 🔒 로그인 제한 관련 함수들
+# -----------------------------------------------------------------------------
+def get_client_ip():
+    """클라이언트 IP 주소 가져오기 (Streamlit 환경)"""
+    try:
+        # Streamlit 1.31.0 이상
+        from streamlit.runtime.scriptrunner import get_script_run_ctx
+        ctx = get_script_run_ctx()
+        if ctx is not None:
+            # 헤더에서 IP 추출 시도
+            headers = st.context.headers if hasattr(st, 'context') else {}
+            # 프록시 뒤에 있는 경우 X-Forwarded-For 사용
+            ip = headers.get('X-Forwarded-For', headers.get('X-Real-Ip', 'unknown'))
+            if ip and ip != 'unknown':
+                return ip.split(',')[0].strip()  # 첫 번째 IP만
+    except:
+        pass
+    return "unknown"
+
+def load_json_file(filepath, default=None):
+    """JSON 파일 로드 (없으면 기본값 반환)"""
+    if default is None:
+        default = {}
+    try:
+        if os.path.exists(filepath):
+            with open(filepath, 'r', encoding='utf-8') as f:
+                return json.load(f)
+    except (json.JSONDecodeError, IOError):
+        pass
+    return default
+
+def save_json_file(filepath, data):
+    """JSON 파일 저장"""
+    try:
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except IOError as e:
+        st.error(f"파일 저장 오류: {e}")
+
+def is_blocked(identifier):
+    """차단 여부 확인 (username 또는 IP)"""
+    blocked = load_json_file(BLOCKED_USERS_FILE, {"blocked": []})
+    blocked_list = blocked.get("blocked", [])
+    
+    for entry in blocked_list:
+        if entry.get("username") == identifier or entry.get("ip") == identifier:
+            return True
+    return False
+
+def get_login_attempts(identifier):
+    """로그인 시도 횟수 조회"""
+    attempts = load_json_file(LOGIN_ATTEMPTS_FILE, {})
+    return attempts.get(identifier, 0)
+
+def increment_login_attempts(identifier, ip="unknown"):
+    """로그인 시도 횟수 증가"""
+    attempts = load_json_file(LOGIN_ATTEMPTS_FILE, {})
+    current = attempts.get(identifier, 0) + 1
+    attempts[identifier] = current
+    save_json_file(LOGIN_ATTEMPTS_FILE, attempts)
+    
+    # 최대 시도 횟수 초과 시 차단 목록에 추가
+    if current >= MAX_LOGIN_ATTEMPTS:
+        block_user(identifier, ip)
+    
+    return current
+
+def reset_login_attempts(identifier):
+    """로그인 시도 횟수 초기화 (로그인 성공 시)"""
+    attempts = load_json_file(LOGIN_ATTEMPTS_FILE, {})
+    if identifier in attempts:
+        del attempts[identifier]
+        save_json_file(LOGIN_ATTEMPTS_FILE, attempts)
+
+def block_user(identifier, ip="unknown"):
+    """사용자/IP 차단"""
+    blocked = load_json_file(BLOCKED_USERS_FILE, {"blocked": []})
+    
+    # 이미 차단되어 있는지 확인
+    for entry in blocked["blocked"]:
+        if entry.get("username") == identifier:
+            return  # 이미 차단됨
+    
+    # 차단 목록에 추가
+    blocked["blocked"].append({
+        "username": identifier,
+        "ip": ip,
+        "blocked_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "reason": f"로그인 {MAX_LOGIN_ATTEMPTS}회 실패"
+    })
+    save_json_file(BLOCKED_USERS_FILE, blocked)
+
+def get_remaining_attempts(identifier):
+    """남은 시도 횟수 반환"""
+    current = get_login_attempts(identifier)
+    return max(0, MAX_LOGIN_ATTEMPTS - current)
+
+# -----------------------------------------------------------------------------
 # 1. 전역 설정 및 상수 정의
 # -----------------------------------------------------------------------------
 st.set_page_config(
@@ -177,6 +282,51 @@ st.markdown(f"""
     hr {{
         border-color: {THEME['border']};
     }}
+
+    /* 🔒 차단/경고 메시지 스타일 */
+    .blocked-warning {{
+        background: linear-gradient(135deg, #2d1f1f 0%, #1a1a1a 100%);
+        border: 2px solid {THEME['accent_red']};
+        border-radius: 12px;
+        padding: 30px;
+        text-align: center;
+        margin: 50px auto;
+        max-width: 500px;
+    }}
+    
+    .blocked-icon {{
+        font-size: 48px;
+        margin-bottom: 15px;
+    }}
+    
+    .blocked-title {{
+        color: {THEME['accent_red']};
+        font-size: 24px;
+        font-weight: 700;
+        margin-bottom: 10px;
+    }}
+    
+    .blocked-message {{
+        color: {THEME['text_sub']};
+        font-size: 14px;
+        line-height: 1.6;
+    }}
+    
+    .attempts-warning {{
+        background-color: rgba(253, 214, 99, 0.1);
+        border: 1px solid {THEME['accent_yellow']};
+        border-radius: 8px;
+        padding: 10px 15px;
+        margin-top: 10px;
+        text-align: center;
+    }}
+    
+    .attempts-text {{
+        color: {THEME['accent_yellow']};
+        font-size: 14px;
+        font-weight: 500;
+    }}
+
     </style>
     """, unsafe_allow_html=True)
 
@@ -243,16 +393,36 @@ def main():
     except FileNotFoundError:
         st.error("config.yaml 파일을 찾을 수 없습니다.")
         return
+    
+    # [2] 클라이언트 IP 가져오기
+    client_ip = get_client_ip()
 
-    # [2] 인증 객체 생성
+    # [3] IP 차단 여부 먼저 확인
+    if is_blocked(client_ip) and client_ip != "unknown":
+        st.markdown("""
+            <div class="blocked-warning">
+                <div class="blocked-icon">🚫</div>
+                <div class="blocked-title">접근이 차단되었습니다</div>
+                <div class="blocked-message">
+                    비정상적인 로그인 시도가 감지되어<br>
+                    해당 IP에서의 접근이 차단되었습니다.<br><br>
+                    문의: 관리자에게 연락하세요.
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+        return
+
+    # [4] 인증 객체 생성
     authenticator = stauth.Authenticate(
         config['credentials'],
         config['cookie']['name'],
         config['cookie']['key'],
         config['cookie']['expiry_days']
     )
+    # [5] 로그인 전 상태 저장 (시도 횟수 추적용)
+    prev_auth_status = st.session_state.get('authentication_status')
 
-    # [3] 로그인 위젯 표시 (메인 화면 중앙에 뜸)
+    # [6] 로그인 위젯 표시 (메인 화면 중앙에 뜸)
     authenticator.login('main')
 
     # 금고(session_state)에서 값 꺼내오기
@@ -260,14 +430,77 @@ def main():
     name = st.session_state.get('name')
     username = st.session_state.get('username')
 
-    # [4] 로그인 상태에 따른 분기 처리
+    # [7] 로그인 상태에 따른 분기 처리
+    
+    # ❌ 로그인 실패 시
     if authentication_status is False:
-        st.error('아이디 또는 비밀번호가 틀렸습니다.')
-        return  # 더 이상 코드 실행 안 함
+        # 입력된 username 가져오기 (폼에서)
+        attempted_username = st.session_state.get('username', client_ip)
+        identifier = attempted_username if attempted_username else client_ip
+        
+        # 이미 차단된 사용자인지 확인
+        if is_blocked(identifier):
+            st.markdown("""
+                <div class="blocked-warning">
+                    <div class="blocked-icon">🚫</div>
+                    <div class="blocked-title">계정이 잠겼습니다</div>
+                    <div class="blocked-message">
+                        로그인 시도 횟수를 초과하여<br>
+                        계정 접근이 차단되었습니다.<br><br>
+                        관리자에게 문의하세요.
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+            return
+        
+        # 시도 횟수 증가 (이전에 None이었고 지금 False면 = 방금 실패한 것)
+        if prev_auth_status is None or prev_auth_status is True:
+            current_attempts = increment_login_attempts(identifier, client_ip)
+        else:
+            current_attempts = get_login_attempts(identifier)
+        
+        remaining = MAX_LOGIN_ATTEMPTS - current_attempts
+        
+        if remaining <= 0:
+            st.markdown("""
+                <div class="blocked-warning">
+                    <div class="blocked-icon">🔒</div>
+                    <div class="blocked-title">계정이 잠겼습니다</div>
+                    <div class="blocked-message">
+                        로그인 시도 횟수를 모두 소진하였습니다.<br>
+                        관리자에게 문의하여 차단 해제를 요청하세요.
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+            return
+        else:
+            st.error('❌ 아이디 또는 비밀번호가 틀렸습니다.')
+            
+            # 남은 횟수 경고 표시
+            if remaining <= 3:
+                warning_color = THEME['accent_red'] if remaining <= 2 else THEME['accent_yellow']
+                st.markdown(f"""
+                    <div class="attempts-warning" style="border-color: {warning_color};">
+                        <span class="attempts-text" style="color: {warning_color};">
+                            ⚠️ 남은 시도 횟수: {remaining}회 
+                            {'(마지막 기회입니다!)' if remaining == 1 else ''}
+                        </span>
+                    </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.info(f"ℹ️ 남은 시도 횟수: {remaining}회")
+        return
 
+    # ⏳ 로그인 대기 상태
     elif authentication_status is None:
         st.warning('아이디와 비밀번호를 입력해주세요.')
-        return  # 더 이상 코드 실행 안 함
+        
+        # IP 기반 시도 횟수 표시 (이미 실패한 적 있으면)
+        ip_attempts = get_login_attempts(client_ip)
+        if ip_attempts > 0:
+            remaining = MAX_LOGIN_ATTEMPTS - ip_attempts
+            st.info(f"ℹ️ 현재 IP에서 {ip_attempts}회 실패 / 남은 기회: {remaining}회")
+        return
 
     # =========================================================================
     # [5] 로그인 성공 시에만 실행되는 영역 (기존 대시보드 코드)
