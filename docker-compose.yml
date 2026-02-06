@@ -1,7 +1,4 @@
 services:
-  # ----------------------------------------------------------------
-  # [App] Streamlit Dashboard
-  # ----------------------------------------------------------------
   app:
     build:
       context: .
@@ -21,9 +18,6 @@ services:
       - proxy-network
       - kilostone-internal
 
-  # ----------------------------------------------------------------
-  # [Database] MariaDB
-  # ----------------------------------------------------------------
   db:
     image: mariadb:10.6
     container_name: kilostone-db
@@ -39,26 +33,6 @@ services:
       - kilostone-internal
     command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
 
-  # ----------------------------------------------------------------
-  # [Proxy] Nginx Proxy Manager
-  # ----------------------------------------------------------------
-  proxy:
-    image: jc21/nginx-proxy-manager:latest
-    container_name: proxy-manager
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "81:81"
-      - "443:443"
-    volumes:
-      - ./data-npm:/data
-      - ./letsencrypt:/etc/letsencrypt
-    networks:
-      - proxy-network
-
-# ----------------------------------------------------------------
-# [Networks]
-# ----------------------------------------------------------------
 networks:
   proxy-network:
     external: true
