@@ -49,7 +49,7 @@ KiloStone Dashboard는 개인 화물 트럭 차주를 위한 운행 기록 관�
 | Language | Python 3.12 |
 | Framework | Streamlit |
 | Database | MariaDB 10.6 |
-| AI | Google Gemini 2.0 Flash |
+| AI | Google Gemini 2.5 Flash |
 | Infrastructure | AWS EC2, Docker Compose |
 | CI/CD | GitHub Actions |
 | Reverse Proxy | Nginx Proxy Manager |
