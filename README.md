@@ -58,41 +58,65 @@ KiloStone Dashboard는 개인 화물 트럭 차주를 위한 운행 기록 관�
 
 ## 프로젝트 구조
 
-```
-kilostone-dashboard/
-├── .github/
-│   └── workflows/
-│       └── deploy.yml          # CI/CD 워크플로우
-├── .streamlit/
-│   └── config.toml             # Streamlit 테마 설정
-├── app/
-│   ├── auth/
-│   │   └── login_guard.py      # 로그인 시도 제한 및 IP 차단
-│   ├── components/
-│   │   ├── charts.py           # 차트 스타일링 헬퍼
-│   │   ├── kpi_cards.py        # KPI 카드 컴포넌트
-│   │   └── sidebar.py          # 사이드바 렌더링
-│   ├── services/
-│   │   ├── data_loader.py      # 데이터 로드 및 캐싱
-│   │   ├── database.py         # DB 연결 관리
-│   │   └── queries.py          # SQL 쿼리
-│   ├── views/
-│   │   ├── overview.py         # 전체 운행 현황 탭
-│   │   └── vehicle.py          # 차량별 비교 탭
-│   ├── config.py               # 전역 설정 및 상수
-│   ├── main.py                 # 애플리케이션 엔트리포인트
-│   └── styles.py               # CSS 스타일 정의
-├── assets/                     # 로고 및 이미지
-├── data/                       # 영구 데이터 저장소 (볼륨 마운트)
-├── scripts/
-│   ├── cleaning_*.py           # AI 데이터 정제 스크립트
-│   ├── db_initializer.py       # DB 초기화
-│   └── *_check.py              # 데이터 검증 스크립트
-├── docker-compose.yml
-├── dockerfile
-├── requirements.txt
-└── config.yaml                 # 인증 설정 (gitignore)
-```
+    kilostone-dashboard/
+    ├── .github/
+    │   └── workflows/
+    │       └── deploy.yml              # CI/CD 워크플로우
+    ├── .streamlit/
+    │   └── config.toml                 # Streamlit 테마 설정
+    ├── app/
+    │   ├── auth/
+    │   │   └── login_guard.py          # 로그인 시도 제한 및 IP 차단
+    │   ├── components/
+    │   │   ├── charts.py               # 차트 스타일링 헬퍼
+    │   │   ├── kpi_cards.py            # KPI 카드 컴포넌트
+    │   │   └── sidebar.py              # 사이드바 렌더링
+    │   ├── pages/                      # (확장용, 현재 미사용)
+    │   ├── services/
+    │   │   ├── database.py             # DB 연결 관리
+    │   │   └── data_loader.py          # 데이터 로드 및 캐싱
+    │   ├── utils/
+    │   │   └── common.py               # 공통 유틸리티
+    │   ├── views/
+    │   │   ├── overview.py             # 전체 운행 현황 탭
+    │   │   └── vehicle.py              # 차량별 비교 탭
+    │   ├── config.py                   # 전역 설정 및 상수
+    │   ├── main.py                     # 애플리케이션 엔트리포인트
+    │   └── styles.py                   # CSS 스타일 정의
+    ├── assets/                         # 로고 및 이미지
+    ├── data/
+    │   ├── raw/                        # 원본 데이터 (Excel)
+    │   └── processed/                  # 정제된 데이터 (CSV)
+    ├── scripts/
+    │   ├── cleaning_messy_*.py         # Messy 데이터 정제 (형식 오류)
+    │   ├── cleaning_dirty_*.py         # Dirty 데이터 정제 (AI 이상치 탐지)
+    │   ├── apply_corrections.py        # AI 보정 적용
+    │   ├── db_initializer.py           # DB 테이블 생성 및 데이터 적재
+    │   └── *_check.py                  # 데이터 검증 스크립트
+    ├── .env                            # 환경변수 (gitignore)
+    ├── docker-compose.yml
+    ├── Dockerfile
+    ├── requirements.txt
+    └── config.yaml                     # 인증 설정 (gitignore)
+
+---
+
+## 데이터 파이프라인
+
+### 과거 데이터 (2016~2020)
+수기 입력된 Excel 원본 데이터를 2단계 정제 후 DB에 적재:
+
+    Excel (raw) → Messy 정제 → Dirty 정제 (AI) → CSV (processed) → MariaDB
+
+| 단계 | 스크립트 | 처리 내용 |
+|------|----------|----------|
+| 1단계 | cleaning_messy_*.py | 날짜/숫자 형식 통일, 컬럼명 표준화 |
+| 2단계 | cleaning_dirty_*.py | Gemini API로 이상치 탐지 및 보정 제안 |
+| 적용 | apply_corrections.py | AI 제안 검토 후 최종 CSV 생성 |
+| 적재 | db_initializer.py | MariaDB 테이블 생성 및 Bulk Insert |
+
+### 신규 데이터 (예정)
+대시보드 내 입력 폼에서 직접 기입 → 실시간 검증 → DB 저장 (AI 정제 불필요)
 
 ---
 
@@ -104,30 +128,29 @@ kilostone-dashboard/
 
 ### 설치
 
-```bash
-# 저장소 클론
-git clone https://github.com/kjs001791/kilostone-dashboard.git
-cd kilostone-dashboard
+    # 저장소 클론
+    git clone https://github.com/kjs001791/kilostone-dashboard.git
+    cd kilostone-dashboard
 
-# 환경 변수 설정
-cat <<EOF > .env
-DB_PASSWORD=your_password
-DB_NAME=kilostone
-DB_USER=root
-DB_HOST=db
-GOOGLE_API_KEY=your_gemini_api_key
-EOF
+    # 환경 변수 설정
+    cat <<EOF > .env
+    DB_HOST=db
+    DB_PORT=3306
+    DB_USER=root
+    DB_PASSWORD=your_password
+    DB_NAME=kilostone
+    GOOGLE_API_KEY=your_gemini_api_key
+    EOF
 
-# 인증 설정 (config.yaml 생성 필요)
-# hash_gen.py로 비밀번호 해시 생성 후 config.yaml에 추가
+    # 인증 설정 (config.yaml 생성 필요)
+    # hash_gen.py로 비밀번호 해시 생성 후 config.yaml에 추가
 
-# 실행
-docker compose up -d --build
-```
+    # 실행
+    docker compose up -d --build
 
 ### 접속
-- 대시보드: `http://localhost:8501` 또는 설정된 도메인
-- Nginx Proxy Manager: `http://localhost:81`
+- 대시보드: http://localhost:8501 또는 설정된 도메인
+- Nginx Proxy Manager: http://localhost:81
 
 ---
 
@@ -135,13 +158,11 @@ docker compose up -d --build
 
 main 브랜치에 push 시 GitHub Actions가 자동으로 서버에 배포한다.
 
-```yaml
-# .github/workflows/deploy.yml 주요 흐름
-1. SSH로 서버 접속
-2. git fetch && git reset --hard origin/main
-3. docker compose build --no-cache
-4. docker compose up -d --force-recreate
-```
+    # .github/workflows/deploy.yml 주요 흐름
+    1. SSH로 서버 접속
+    2. git fetch && git reset --hard origin/main
+    3. docker compose build --no-cache
+    4. docker compose up -d --force-recreate
 
 ---
 
@@ -150,7 +171,7 @@ main 브랜치에 push 시 GitHub Actions가 자동으로 서버에 배포한다
 ### 레거시 하드웨어 극복
 초기 개발 환경은 AMD Athlon 64 X2 기반의 15년 된 서버였다. 해당 CPU는 AVX 명령어를 지원하지 않아 최신 Python 라이브러리(Pandas, NumPy 등)의 사전 빌드 바이너리 실행이 불가능했다.
 
-Docker 빌드 시 `--no-binary` 옵션으로 소스 컴파일을 강제하여 해결했으며, 이후 AWS EC2로 마이그레이션하여 현재 구조에 이르렀다.
+Docker 빌드 시 --no-binary 옵션으로 소스 컴파일을 강제하여 해결했으며, 이후 AWS EC2로 마이그레이션하여 현재 구조에 이르렀다.
 
 ### 주요 개선 사항
 - 단일 main.py(500줄) → 모듈별 분리 구조로 리팩토링
