@@ -107,6 +107,7 @@ def init_db():
         consumed_fuel FLOAT,
         refuel FLOAT,
         reurea FLOAT,
+        source VARCHAR(20) DEFAULT 'pipeline',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
     """

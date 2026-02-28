@@ -16,7 +16,7 @@ def load_data():
     try:
         engine = get_db_engine()
         query = """
-        SELECT date, vehicle_id, fuel_efficiency, speed, time, 
+        SELECT id, date, vehicle_id, fuel_efficiency, speed, time, 
                distance, cumulative_distance, consumed_fuel, refuel, reurea 
         FROM driving_logs 
         ORDER BY date ASC

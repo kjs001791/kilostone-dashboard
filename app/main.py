@@ -21,6 +21,7 @@ from auth.login_guard import (
 from components.sidebar import render_sidebar
 from views.overview import render_overview_tab
 from views.vehicle import render_vehicle_tab
+from views.data_entry import render_data_entry_tab
 from services.data_loader import load_data
 
 
@@ -186,13 +187,20 @@ def main():
         return
 
     # 메인 컨텐츠
-    tab1, tab2 = st.tabs(["전체 운행 현황", "차량별 비교 분석"])
+    tab1, tab2, tab3 = st.tabs([
+        "전체 운행 현황", 
+        "차량별 비교 분석",
+        "운행기록 관리"
+    ])
 
     with tab1:
         render_overview_tab(df, filtered_df, selected_days, resample_option)
 
     with tab2:
         render_vehicle_tab(filtered_df)
+
+    with tab3:
+        render_data_entry_tab(df)
 
     # 하단 로그 데이터
     st.divider()

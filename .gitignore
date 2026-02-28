@@ -15,3 +15,10 @@ config.yaml
 hash_gen.py
 
 aws-key.pem
+
+# ===== Pipeline staging (테스트 산출물) =====
+data/staging/*_TEST.*
+data/staging/*_TEST_*
+
+# ===== staging 중간 파일 (선택: 정식 산출물도 제외하려면 아래 주석 해제) =====
+# data/staging/
