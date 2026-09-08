@@ -1,11 +1,12 @@
 """
-Step 3: Dirty Data 정제 (Gemini API)
-의심 데이터를 필터링하고, Gemini API에 비동기 배치 요청하여 수정 제안서(proposal) 생성.
+Step 3: Dirty Data 정제 (AI API)
+의심 데이터를 필터링하고, AI API에 비동기 배치 요청하여 수정 제안서(proposal) 생성.
 """
 
 import sys
 import json
 import asyncio
+import abc
 from pathlib import Path
 from datetime import datetime
 
@@ -20,6 +21,59 @@ from pipeline.schema_config import (
     convert_time_to_hours,
 )
 
+# =================================================================
+# AI Provider 추상화
+# =================================================================
+class AIProvider(abc.ABC):
+    @abc.abstractmethod
+    async def call(self, session, prompt, semaphore, retries=3):
+        pass
+
+class GeminiProvider(AIProvider):
+    def __init__(self, api_key, api_url):
+        self.api_key = api_key
+        self.api_url = api_url
+
+    async def call(self, session, prompt, semaphore, retries=3):
+        """Gemini API 단일 호출 (재시도 포함)"""
+        headers = {'Content-Type': 'application/json'}
+        data = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {
+                "temperature": 0.1,
+                "responseMimeType": "application/json",
+            },
+        }
+        async with semaphore:
+            for attempt in range(retries):
+                try:
+                    async with session.post(self.api_url, headers=headers, json=data) as resp:
+                        if resp.status == 200:
+                            result = await resp.json()
+                            text = result['candidates'][0]['content']['parts'][0]['text']
+                            parsed = json.loads(text)
+                            return [parsed] if isinstance(parsed, dict) else parsed
+                        elif resp.status == 429:
+                            await asyncio.sleep((attempt + 1) * 5)
+                        else:
+                            return []
+                except Exception:
+                    await asyncio.sleep(3)
+        return []
+
+# 향후 ClaudeProvider, OpenAIProvider 등 추가 가능
+
+def get_ai_provider():
+    import os
+    provider_name = os.getenv("AI_PROVIDER", "gemini").lower()
+    if provider_name == "gemini":
+        return GeminiProvider(API_KEY, API_URL)
+    # elif provider_name == "claude":
+    #     return ClaudeProvider(...)
+    else:
+        # Default to Gemini
+        return GeminiProvider(API_KEY, API_URL)
+
 
 # =================================================================
 # 참조값 계산
@@ -28,15 +82,23 @@ def add_reference_columns(df):
     """원본 값으로부터 교차검증용 참조값(Reference) 계산"""
     df = df.replace([np.inf, -np.inf], np.nan)
 
-    for col, new in {
+    num_cols = {
         'speed': 'speed_num',
         'consumed_fuel': 'fuel_num',
         'fuel_efficiency': 'eff_num',
         'distance': 'dist_num',
-    }.items():
-        df[new] = pd.to_numeric(df[col], errors='coerce')
+        'consumed_fuel_idle': 'fuel_idl_num',
+        'consumed_fuel_pto': 'fuel_pto_num',
+    }
+    for col, new in num_cols.items():
+        if col in df.columns:
+            df[new] = pd.to_numeric(df[col], errors='coerce')
+        else:
+            df[new] = 0
 
     df['time_num'] = df['time'].apply(convert_time_to_hours)
+    df['time_idl_num'] = df['time_idle'].apply(convert_time_to_hours) if 'time_idle' in df.columns else 0
+    df['time_pto_num'] = df['time_pto'].apply(convert_time_to_hours) if 'time_pto' in df.columns else 0
 
     # 물리 시스템: distance = speed × time
     df['ref_dist_phys'] = (df['speed_num'] * df['time_num']).round(2)
@@ -55,16 +117,14 @@ def add_reference_columns(df):
         if pd.notnull(x['fuel_num']) and x['fuel_num'] > 0 else 0,
         axis=1
     )
-    df['ref_speed'] = df.apply(
-        lambda x: round(x['dist_num'] / x['time_num'], 2)
+    
+    # 스카니아 전용: 시간당 연료 소모율 검증 (fuel_rate_per_hour ≈ consumed_fuel / time)
+    df['ref_fuel_rate'] = df.apply(
+        lambda x: round(x['fuel_num'] / x['time_num'], 2)
         if pd.notnull(x['time_num']) and x['time_num'] > 0 else 0,
         axis=1
     )
-    df['ref_time'] = df.apply(
-        lambda x: round(x['dist_num'] / x['speed_num'], 2)
-        if pd.notnull(x['speed_num']) and x['speed_num'] > 0 else 0,
-        axis=1
-    )
+
     return df
 
 
@@ -92,7 +152,7 @@ def validate_proposal(row):
             except:
                 pass
 
-        if target == 'time':
+        if 'time' in target:
             parts = str(val).split(':')
             if len(parts) >= 1 and int(parts[0]) >= 24:
                 return False
@@ -109,37 +169,6 @@ def validate_proposal(row):
 
 
 # =================================================================
-# Gemini API 비동기 호출
-# =================================================================
-async def call_gemini(session, prompt, semaphore, retries=3):
-    """Gemini API 단일 호출 (재시도 포함)"""
-    headers = {'Content-Type': 'application/json'}
-    data = {
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {
-            "temperature": 0.1,
-            "responseMimeType": "application/json",
-        },
-    }
-    async with semaphore:
-        for attempt in range(retries):
-            try:
-                async with session.post(API_URL, headers=headers, json=data) as resp:
-                    if resp.status == 200:
-                        result = await resp.json()
-                        text = result['candidates'][0]['content']['parts'][0]['text']
-                        parsed = json.loads(text)
-                        return [parsed] if isinstance(parsed, dict) else parsed
-                    elif resp.status == 429:
-                        await asyncio.sleep((attempt + 1) * 5)
-                    else:
-                        return []
-            except Exception:
-                await asyncio.sleep(3)
-    return []
-
-
-# =================================================================
 # 프롬프트 생성
 # =================================================================
 def get_prompt(stats, data_json):
@@ -152,99 +181,66 @@ def get_prompt(stats, data_json):
     """
     
     # =================================================================
-    # 프롬프트 및 Few-Shot 예제
+    # 프롬프트 및 Few-Shot 예제 (스카니아 특화 포함)
     # =================================================================
     few_shot_examples = """
     [Case 1: Unit Error (Reurea)]
     - Input: {"id": 10, "reurea": 6}
-    - Reasoning: Single digit reurea (1~9) is a recording error (Event count). Force replace with standard unit 20L.
-    - Output: [{"id": 10, "target": "reurea", "original": 6, "proposed": 20, "reference": null, "reason": "Unit error correction (Force 6 -> 20L). Standard refill volume."}]
+    - Reasoning: Single digit reurea (1~9) is a recording error. Force replace with standard unit 20L.
+    - Output: [{"id": 10, "target": "reurea", "original": 6, "proposed": 20, "reference": null, "reason": "Unit error (6->20L)."}]
 
-    [Case 2: Copy-Paste Error (Distance == Fuel)]
-    - Input: {"id": 55, "distance": 133.51, "consumed_fuel": 133.51, "fuel_efficiency": 2.77}
-    - Context: Monthly Avg Distance = 450.0 km
-    - Reasoning: 
-      1. Distance and Fuel are identical (133.51). One is wrong.
-      2. Compare with Avg Dist (450.0): 133.51 is suspiciously low.
-      3. Assume Fuel (133.51) is correct. Recalculate Dist = Fuel * Eff.
-    - Output: [{"id": 55, "target": "distance", "original": 133.51, "proposed": 369.8, "reference": 369.8, "reason": "Copy error (Dist=Fuel). Recalculated distance using fuel * efficiency."}]
+    [Case 2: Scania Logic Error (IDL + PTO > TOT)]
+    - Input: {"id": 301, "consumed_fuel": 150.5, "consumed_fuel_idle": 120.0, "consumed_fuel_pto": 50.5}
+    - Reasoning: IDL(120) + PTO(50.5) = 170.5, which is > TOT(150.5). Impossible. Typo in IDL: 12.0 is more likely.
+    - Output: [{"id": 301, "target": "consumed_fuel_idle", "original": 120.0, "proposed": 12.0, "reference": null, "reason": "Scania Logic Error: IDL+PTO > TOT. Corrected IDL decimal (120->12.0)."}]
 
     [Case 3: Digit Omission (Leading Digit)]
     - Input: {"id": 41, "distance": 36.9, "ref_dist_fuel": 538.75}
-    - Reasoning: Original (36.9) is too small vs Reference (538.75). Missing leading '5'. 536.9 matches reference closely.
-    - Output: [{"id": 41, "target": "distance", "original": 36.9, "proposed": 536.9, "reference": 538.75, "reason": "Missing leading digit '5' detected (36.9 -> 536.9)."}]
+    - Reasoning: Original (36.9) too small vs Ref (538.75). Missing leading '5'.
+    - Output: [{"id": 41, "target": "distance", "original": 36.9, "proposed": 536.9, "reference": 538.75, "reason": "Missing leading digit '5' (36.9->536.9)."}]
 
-    [Case 4: Digit Omission (Middle Digit)]
-    - Input: {"id": 42, "consumed_fuel": 17.51, "ref_fuel": 179.17}
-    - Reasoning: Original (17.51) vs Ref (179.17). Missing '9' in middle makes 179.51.
-    - Output: [{"id": 42, "target": "consumed_fuel", "original": 17.51, "proposed": 179.51, "reference": 179.17, "reason": "Missing digit '9' detected (17.51 -> 179.51)."}]
+    [Case 4: Scania Fuel Rate Inconsistency]
+    - Input: {"id": 402, "fuel_rate_per_hour": 1.1, "consumed_fuel": 110.5, "time": "10:00:00"}
+    - Reasoning: Fuel(110.5) / Time(10h) = 11.05. Original fuel_rate(1.1) is missing a digit.
+    - Output: [{"id": 402, "target": "fuel_rate_per_hour", "original": 1.1, "proposed": 11.1, "reference": 11.05, "reason": "Fuel rate typo (1.1->11.1) based on fuel/time ratio."}]
 
     [Case 5: Fat Finger (Double Entry)]
     - Input: {"id": 22, "distance": 4718.1, "ref_dist_fuel": 478.8}
-    - Reasoning: 4718.1 is physically impossible (>1500km). Likely double-tapped '1'. 478.1 is close to Ref.
-    - Output: [{"id": 22, "target": "distance", "original": 4718.1, "proposed": 478.1, "reference": 478.8, "reason": "Fat finger typo (4718.1 -> 478.1). Matches calculated distance."}]
+    - Reasoning: 4718.1 impossible (>1500km). Double-tapped '1'.
+    - Output: [{"id": 22, "target": "distance", "original": 4718.1, "proposed": 478.1, "reference": 478.8, "reason": "Fat finger typo (4718.1->478.1)."}]
 
-    [Case 6: Keypad Neighbor Typo]
-    - Input: {"id": 35, "distance": 638.1, "ref_dist_fuel": 537.3}
-    - Reasoning: 638.1 vs 537.3. Keypad '6' is above '5'. 538.1 matches Ref.
-    - Output: [{"id": 35, "target": "distance", "original": 638.1, "proposed": 538.1, "reference": 537.3, "reason": "Keypad typo suspected (6->5). Validated by calc."}]
+    [Case 6: Scania Time Logic (IDL+PTO > TOT)]
+    - Input: {"id": 505, "time": "12:00:00", "time_idle": "10:30:00", "time_pto": "05:00:00"}
+    - Reasoning: IDL+PTO (15.5h) > TOT(12h). PTO 05:00 likely typo for 00:50 or 01:00.
+    - Output: [{"id": 505, "target": "time_pto", "original": "05:00:00", "proposed": null, "reference": null, "reason": "Scania Time Logic Error: IDL+PTO > TOT. Manual check required."}]
 
-    [Case 7: Cumulative Distance Regression (Logic Error)]
+    [Case 7: Cumulative Distance Regression]
     - Input: {"id": 1254, "cumulative_distance": 131185.0, "prev_cum_dist": 131343.0}
-    - Reasoning: Current < Previous. Impossible. Requires manual check.
-    - Output: [{"id": 1254, "target": "cumulative_distance", "original": 131185.0, "proposed": null, "reference": 131343.0, "reason": "Logic Error: Cumulative distance regression. Manual Check Required."}]
-
-    [Case 8: Time Outlier (> 20h)]
-    - Input: {"id": 720, "time": "35:27:00", "ref_time": "3:30"}
-    - Reasoning: Time 35h is physically impossible (> 20h). Likely typo 35 -> 03.
-    - Output: [{"id": 720, "target": "time", "original": "35:27:00", "proposed": "03:27:00", "reference": "03:30", "reason": "Time outlier (>20h). Corrected to 03:xx based on reference."}]
-
-    [Case 9: Impossible Distance (Decimal Error)]
-    - Input: {"id": 501, "distance": 5305, "time": "12:12:00", "speed": 43.1}
-    - Reasoning: 5305km is impossible (>1500km). Do NOT adjust time to 123h. Fix distance decimal: 5305 -> 530.5.
-    - Output: [{"id": 501, "target": "distance", "original": 5305, "proposed": 530.5, "reference": 525.8, "reason": "Impossible distance outlier. Corrected typo (5305 -> 530.5)."}]
-
-    [Case 10: Ambiguous / Unsolvable]
-    - Input: {"id": 99, "time": "11:64"}
-    - Reasoning: Invalid format, ambiguous fix.
-    - Output: [{"id": 99, "target": "manual_check", "original": "11:64", "proposed": null, "reference": null, "reason": "Invalid time format & ambiguous. Manual review."}]
+    - Reasoning: Current < Previous. Impossible.
+    - Output: [{"id": 1254, "target": "cumulative_distance", "original": 131185.0, "proposed": null, "reference": 131343.0, "reason": "Cumulative distance regression. Manual Check."}]
     """
 
     prompt = f"""
-    You are a Data Cleaning Expert.
+    You are a Data Cleaning Expert for Heavy-duty Truck Logs.
     Your goal is to detect and fix typos by comparing 'User Input' vs 'Calculated Reference'.
+
+    [Scania Vehicle Specifics]
+    - TOT (Total) = Driving + IDL (Idle) + PTO.
+    - So, TOT >= IDL + PTO must hold for both Fuel and Time.
+    - fuel_rate_per_hour (L/h) should be approximately consumed_fuel / time.
 
     [Context Info (Averages)]
     {context_info}
 
     [Logic: Visual Pattern Matching]
-    For each row, I provide the 'Original Input' and the 'Calculated Reference' (derived from other variables).
-    1. Compare the **Original** value with its corresponding **Reference** value.
-    2. If they differ significantly, check if the **Reference** value looks like a corrected version of the **Original** (e.g., typo, missing digit, wrong decimal).
-    3. **Priority:** Trust the value that resolves the conflict with minimum edits to the original digits.
-
-    [Columns Provided]
-    - original: distance, consumed_fuel, fuel_efficiency, speed, time
-    - reference: 
-    - ref_dist_phys (from Speed*Time)
-    - ref_dist_fuel (from Fuel*Eff)
-    - ref_fuel (from Dist/Eff)
-    - ref_efficiency (from Dist/Fuel)
-    - ref_speed (from Dist/Time)
-    - ref_time (from Dist/Speed)
-
-    [Few-Shot Example]
-    {few_shot_examples}
+    1. Compare Original vs Reference.
+    2. If significantly different, check for missing digits, misplaced decimals, or keypad neighbors.
+    3. Priority: Keep most original digits. Use manual_check if ambiguous.
 
     [Output Schema]
     Return a JSON list. If valid, return [].
     {{
-        "id": (int),
-        "target": (str),
-        "original": (value),
-        "proposed": (value),
-        "reference": (value),
-        "reason": (str)
+        "id": (int), "target": (str), "original": (value), "proposed": (value), "reference": (value), "reason": (str)
     }}
 
     [Data to Analyze]
@@ -259,15 +255,16 @@ def get_prompt(stats, data_json):
 # =================================================================
 async def step3_clean_dirty(csv_path, test_mode=False):
     """
-    의심 데이터 필터링 → Gemini API 배치 호출 → 제안서 CSV 생성.
+    의심 데이터 필터링 → AI API 배치 호출 → 제안서 CSV 생성.
     Returns: 제안서 파일 경로 (Path)
     """
     print("\n" + "=" * 60)
-    print("🤖 STEP 3: Dirty Data 정제 (Gemini API)")
+    print("🤖 STEP 3: Dirty Data 정제 (AI API)")
     print("=" * 60)
 
-    if not API_KEY:
-        print("❌ GOOGLE_API_KEY가 .env에 없습니다.")
+    provider = get_ai_provider()
+    if not provider.api_key:
+        print("❌ API Key가 .env에 없습니다.")
         sys.exit(1)
 
     tag = "_TEST" if test_mode else ""
@@ -312,7 +309,7 @@ async def step3_clean_dirty(csv_path, test_mode=False):
                 'avg_fuel': group['consumed_fuel'].mean(),
             }
 
-            # ----- 의심 데이터 필터 (5개 조건) -----
+            # ----- 의심 데이터 필터 -----
 
             # 조건 1: 연비 시스템 불일치
             mask_fuel = (
@@ -348,10 +345,16 @@ async def step3_clean_dirty(csv_path, test_mode=False):
 
             # 조건 5: 누적거리 역전
             mask_cum = mask_cum_error.loc[group.index]
+            
+            # 조건 6: 스카니아 로직 에러 (IDL+PTO > TOT)
+            mask_scania = (
+                ((group['fuel_idl_num'] + group['fuel_pto_num']) > group['fuel_num'] + 0.1) |
+                ((group['time_idl_num'] + group['time_pto_num']) > group['time_num'] + 0.02)
+            )
 
             # 의심 데이터 추출
             suspect = group[
-                mask_fuel | mask_phys | mask_time | mask_reurea | mask_cum
+                mask_fuel | mask_phys | mask_time | mask_reurea | mask_cum | mask_scania
             ].copy()
 
             if suspect.empty:
@@ -362,6 +365,8 @@ async def step3_clean_dirty(csv_path, test_mode=False):
                 'id', 'date', 'vehicle_id', 'distance', 'consumed_fuel',
                 'fuel_efficiency', 'time', 'speed', 'reurea',
                 'cumulative_distance', 'prev_cum_dist', 'ref_time',
+                'fuel_rate_per_hour', 'consumed_fuel_idle', 'consumed_fuel_pto',
+                'time_idle', 'time_pto', 'ref_fuel_rate'
             ]
             for col in target_cols:
                 if col not in suspect.columns:
@@ -374,24 +379,33 @@ async def step3_clean_dirty(csv_path, test_mode=False):
                 async def process(b=batch, s=stats):
                     data_json = b.to_json(orient='records', force_ascii=False)
                     prompt = get_prompt(s, data_json)
-                    return await call_gemini(session, prompt, semaphore)
+                    return await provider.call(session, prompt, semaphore)
 
                 tasks.append(process())
 
-        print(f"📦 {len(tasks)}개 배치 예약됨. 실행 중...")
-
+        print(f"📦 {len(tasks)}개 배치 예약됨. (무료 API 제한을 위해 순차 처리 및 휴식 도입)")
+        
+        completed = 0
         for future in asyncio.as_completed(tasks):
             proposals = await future
+            completed += 1
+            
+            # 요청 간 강제 휴식 (RPM 제한 회피)
+            await asyncio.sleep(3) 
+
             if not proposals:
+                print(f"  [{completed}/{len(tasks)}] ⏩ Skip (No proposals or Error)")
                 continue
 
             res_df = pd.DataFrame(proposals)
             if res_df.empty or 'target' not in res_df.columns:
+                print(f"  [{completed}/{len(tasks)}] ⏩ Skip (Empty result)")
                 continue
 
             # 안전장치
             res_df = res_df[res_df.apply(validate_proposal, axis=1)]
             if res_df.empty:
+                print(f"  [{completed}/{len(tasks)}] ⏩ Skip (Invalid proposals filtered)")
                 continue
 
             # 원본에서 날짜/차량 매핑
@@ -411,7 +425,10 @@ async def step3_clean_dirty(csv_path, test_mode=False):
                 index=False, encoding='utf-8-sig',
             )
             total += len(merged)
-            print(f"  ✅ +{len(merged)}건 (누적 {total})")
+            
+            # 진행률 실시간 출력
+            pct = (completed / len(tasks)) * 100
+            print(f"  [{completed}/{len(tasks)}] ✅ +{len(merged)}건 반영 완료 ({pct:.1f}%)")
 
     # 최종 정렬
     try:

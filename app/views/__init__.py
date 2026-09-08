@@ -1,2 +1,0 @@
-from views.overview import render_overview_tab
-from views.vehicle import render_vehicle_tab

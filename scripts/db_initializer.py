@@ -48,6 +48,44 @@ def create_database_if_not_exists():
         raise e
 
 
+def init_users_table():
+    encoded_password = urllib.parse.quote_plus(DB_PASSWORD) if DB_PASSWORD else ""
+    db_url = f"mysql+pymysql://{DB_USER}:{encoded_password}@{DB_HOST}:{DB_PORT}/{DB_NAME}?charset=utf8mb4"
+    engine = create_engine(db_url)
+
+    with engine.connect() as conn:
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS users (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                username VARCHAR(50) UNIQUE NOT NULL,
+                password_hash VARCHAR(255) NOT NULL,
+                role ENUM('admin', 'driver') NOT NULL DEFAULT 'driver',
+                is_active BOOLEAN NOT NULL DEFAULT TRUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """))
+        conn.commit()
+        print("🔨 users 테이블 확인/생성 완료.")
+
+        admin_username = os.getenv("ADMIN_USERNAME")
+        admin_hash = os.getenv("ADMIN_PASSWORD_HASH")
+        if admin_username and admin_hash:
+            existing = conn.execute(
+                text("SELECT id FROM users WHERE username = :u"),
+                {"u": admin_username}
+            ).fetchone()
+            if not existing:
+                conn.execute(
+                    text("INSERT INTO users (username, password_hash, role) VALUES (:u, :h, 'admin')"),
+                    {"u": admin_username, "h": admin_hash}
+                )
+                conn.commit()
+                print(f"✅ admin 계정 '{admin_username}' 시드 완료.")
+            else:
+                print(f"ℹ️  admin 계정 '{admin_username}' 이미 존재 — 건너뜀.")
+    engine.dispose()
+
+
 def init_db():
     final_csv_path = project_root / 'data' / 'processed' / 'driving_log_2016_2020_final.csv'
 
@@ -62,7 +100,8 @@ def init_db():
     # 1. DB에 넣기로 약속한 '진짜 컬럼' 리스트 정의
     valid_columns = [
         'date', 'vehicle_id', 'fuel_efficiency', 'speed', 'time', 
-        'distance', 'cumulative_distance', 'consumed_fuel', 'refuel', 'reurea'
+        'distance', 'cumulative_distance', 'consumed_fuel', 'refuel', 'reurea',
+        'fuel_rate_per_hour', 'consumed_fuel_idle', 'consumed_fuel_pto', 'time_idle', 'time_pto'
     ]
 
     # 2. DataFrame에서 유효한 컬럼만 쏙 뽑아내기 (Unnamed 컬럼 자동 제거됨)
@@ -101,12 +140,17 @@ def init_db():
         vehicle_id VARCHAR(50),
         fuel_efficiency FLOAT,
         speed FLOAT,
-        time VARCHAR(20),  -- 시간은 '12:30:00' 문자열 또는 TIME 타입
+        time VARCHAR(20),
         distance FLOAT,
         cumulative_distance FLOAT,
         consumed_fuel FLOAT,
         refuel FLOAT,
         reurea FLOAT,
+        fuel_rate_per_hour FLOAT,
+        consumed_fuel_idle FLOAT,
+        consumed_fuel_pto FLOAT,
+        time_idle VARCHAR(20),
+        time_pto VARCHAR(20),
         source VARCHAR(20) DEFAULT 'pipeline',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
@@ -135,4 +179,6 @@ def init_db():
         conn.close()
 
 if __name__ == "__main__":
+    create_database_if_not_exists()
+    init_users_table()
     init_db()

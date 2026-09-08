@@ -36,6 +36,8 @@ def run_dirty_check(df):
         df = df.sort_values(by=['vehicle_id', 'date'])
 
     df['time_h'] = df['time'].apply(convert_time_to_hours)
+    df['time_idl_h'] = df['time_idle'].apply(convert_time_to_hours) if 'time_idle' in df.columns else 0
+    df['time_pto_h'] = df['time_pto'].apply(convert_time_to_hours) if 'time_pto' in df.columns else 0
 
     issues = []
 
@@ -87,7 +89,7 @@ def run_dirty_check(df):
                 'message': f"속도 과다 ({row['speed']} > {LIMITS['MAX_SPEED']} km/h)",
             })
 
-        # 연비 하한
+        # 연비 범위
         if pd.notna(row.get('fuel_efficiency')):
             if row['fuel_efficiency'] < LIMITS['EFFICIENCY_MIN']:
                 issues.append({
@@ -159,8 +161,45 @@ def run_dirty_check(df):
                         'message': f"물리적 거리 불일치 ({error_ratio * 100:.1f}%)",
                     })
 
-    check3_count = len(issues) - before_count
-    print(f"    → {check3_count}건 발견")
+    # ----------------------------------------------------------
+    # Check 4: 스카니아 로직 검증 (IDL + PTO <= TOT)
+    # ----------------------------------------------------------
+    print("  [Check 4] 스카니아 복합 로직 검증...")
+    for idx, row in df.iterrows():
+        # 연료 (TOT >= IDL + PTO)
+        fuel_tot = row.get('consumed_fuel', 0)
+        fuel_idl = row.get('consumed_fuel_idle', 0)
+        fuel_pto = row.get('consumed_fuel_pto', 0)
+        
+        if pd.notna(fuel_tot) and (pd.notna(fuel_idl) or pd.notna(fuel_pto)):
+            if fuel_idl + fuel_pto > fuel_tot + 0.1: # 0.1L 오차 허용
+                issues.append({
+                    'id': row.get('id', idx),
+                    'date': row['date'],
+                    'issue_type': 'Logic Error',
+                    'column': 'consumed_fuel',
+                    'value': fuel_tot,
+                    'message': f"스카니아 연료 로직 오류 (TOT:{fuel_tot} < IDL+PTO:{fuel_idl + fuel_pto})",
+                })
+        
+        # 시간 (TOT >= IDL + PTO)
+        time_h = row.get('time_h', 0)
+        time_idl_h = row.get('time_idl_h', 0)
+        time_pto_h = row.get('time_pto_h', 0)
+        
+        if pd.notna(time_h) and (pd.notna(time_idl_h) or pd.notna(time_pto_h)):
+            if time_idl_h + time_pto_h > time_h + 0.02: # 약 1분 오차 허용
+                issues.append({
+                    'id': row.get('id', idx),
+                    'date': row['date'],
+                    'issue_type': 'Logic Error',
+                    'column': 'time',
+                    'value': row.get('time'),
+                    'message': f"스카니아 시간 로직 오류 (TOT:{time_h:.2f}h < IDL+PTO:{time_idl_h + time_pto_h:.2f}h)",
+                })
+
+    check4_count = len(issues) - before_count
+    print(f"    → {len(issues) - before_count}건 발견")
 
     return issues
 
@@ -216,6 +255,7 @@ def step5_validate_and_load(applied_path, test_mode=False):
     """
     최종 검증 → 통과 시 DB 적재 + processed에 최종 CSV 저장.
     실패 시 리포트 출력 + 적재 중단.
+    Returns: (success: bool, rows_processed: int, rows_rejected: int)
     """
     print("\n" + "=" * 60)
     print("🔍 STEP 5: 최종 무결성 검증" + (" (TEST MODE)" if test_mode else ""))
@@ -233,6 +273,9 @@ def step5_validate_and_load(applied_path, test_mode=False):
 
     # 검증 실행
     issues = run_dirty_check(df)
+    
+    rows_processed = len(df)
+    rows_rejected = len(issues)
 
     # ----------------------------------------------------------
     # 결과 처리
@@ -260,10 +303,10 @@ def step5_validate_and_load(applied_path, test_mode=False):
         if not test_mode:
             # --force 옵션 체크는 run_pipeline.py에서 처리
             print("\n❌ 적재 중단. 리포트를 확인하세요.")
-            return False
+            return False, rows_processed, rows_rejected
         else:
             print("\n🧪 테스트 모드: DB 적재 건너뜀")
-            return False
+            return False, rows_processed, rows_rejected
     else:
         print("\n" + "-" * 40)
         print("✅ 검증 통과! 이상 데이터 없음.")
@@ -283,7 +326,7 @@ def step5_validate_and_load(applied_path, test_mode=False):
     else:
         load_to_db(df)
 
-    return True
+    return True, rows_processed, rows_rejected
 
 
 def step5_force_load(applied_path):
@@ -302,7 +345,10 @@ def step5_force_load(applied_path):
 
     # DB 적재
     load_to_db(df)
-    return True
+    
+    # 강제 적재 시에도 통계는 계산
+    issues = run_dirty_check(df)
+    return len(df), len(issues)
 
 
 # =================================================================

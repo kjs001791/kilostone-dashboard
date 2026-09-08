@@ -62,33 +62,55 @@ def step2_check_messy(csv_path, test_mode=False):
         print("  ✅ 정상")
 
     # ----------------------------------------------------------
-    # Check 4: 스키마 시점 검증 (2019.05 전후)
+    # Check 4: 스키마 시점 검증 (MAN / 대우 / 스카니아)
     # ----------------------------------------------------------
-    print("\n[Check 4] 스키마 시점 변화 검증 (2019.05 기준)")
-    split_date = pd.to_datetime("2019-05-01")
+    print("\n[Check 4] 스키마 시점별 데이터 정합성 검증")
+    
+    daewoo_start = pd.to_datetime("2019-04-01")
+    scania_start = pd.to_datetime("2023-12-01")
 
-    df_old = df[df['date'] < split_date]
-    df_new = df[df['date'] >= split_date]
-
-    if len(df_old) > 0:
-        old_cum_null_pct = df_old['cumulative_distance'].isna().sum() / len(df_old) * 100
-        print(f"  [과거 ~2019.04] {len(df_old)}행")
-        print(f"    누적거리 Null 비율: {old_cum_null_pct:.1f}% (높아야 정상)")
-        if old_cum_null_pct < 80:
-            print(f"    🚨 과거 데이터에 누적거리가 너무 많이 채워져 있음")
+    # 1. MAN 기간 (~2019.03)
+    df_man = df[df['date'] < daewoo_start]
+    if len(df_man) > 0:
+        man_cum_null_pct = df_man['cumulative_distance'].isna().sum() / len(df_man) * 100
+        man_speed_null_pct = df_man['speed'].isna().sum() / len(df_man) * 100
+        print(f"  🚜 [MAN ~2019.03] {len(df_man)}행")
+        print(f"    - 누적거리 Null 비율: {man_cum_null_pct:.1f}% (높아야 정상)")
+        print(f"    - 속도 Null 비율: {man_speed_null_pct:.1f}% (낮아야 정상)")
+        if man_cum_null_pct < 80:
+            print("    🚨 MAN 데이터에 누적거리가 너무 많이 채워져 있음")
+            issues += 1
+        if man_speed_null_pct > 30:
+            print("    🚨 MAN 데이터에 속도가 너무 많이 누락됨")
             issues += 1
 
-    if len(df_new) > 0:
-        new_speed_null_pct = df_new['speed'].isna().sum() / len(df_new) * 100
-        new_time_null_pct = df_new['time'].isna().sum() / len(df_new) * 100
-        print(f"  [최신 2019.05~] {len(df_new)}행")
-        print(f"    속도 Null 비율: {new_speed_null_pct:.1f}% (100%에 가까워야 정상)")
-        print(f"    시간 Null 비율: {new_time_null_pct:.1f}% (100%에 가까워야 정상)")
-        if new_speed_null_pct < 90:
-            print(f"    🚨 최신 데이터에 속도 값이 너무 많이 채워져 있음")
+    # 2. 대우프리마 기간 (2019.04~2023.11)
+    df_daewoo = df[(df['date'] >= daewoo_start) & (df['date'] < scania_start)]
+    if len(df_daewoo) > 0:
+        daewoo_cum_null_pct = df_daewoo['cumulative_distance'].isna().sum() / len(df_daewoo) * 100
+        daewoo_speed_null_pct = df_daewoo['speed'].isna().sum() / len(df_daewoo) * 100
+        print(f"  🚛 [대우프리마 2019.04~2023.11] {len(df_daewoo)}행")
+        print(f"    - 누적거리 Null 비율: {daewoo_cum_null_pct:.1f}% (낮아야 정상)")
+        print(f"    - 속도 Null 비율: {daewoo_speed_null_pct:.1f}% (높아야 정상)")
+        if daewoo_cum_null_pct > 30:
+            print("    🚨 대우 데이터에 누적거리가 너무 많이 누락됨")
             issues += 1
-        if new_time_null_pct < 90:
-            print(f"    🚨 최신 데이터에 시간 값이 너무 많이 채워져 있음")
+        if daewoo_speed_null_pct < 80:
+            print("    🚨 대우 데이터에 속도 값이 불필요하게 채워져 있음")
+            issues += 1
+
+    # 3. 스카니아 기간 (2023.12~)
+    df_scania = df[df['date'] >= scania_start]
+    if len(df_scania) > 0:
+        scania_cum_null_pct = df_scania['cumulative_distance'].isna().sum() / len(df_scania) * 100
+        scania_speed_null_pct = df_scania['speed'].isna().sum() / len(df_scania) * 100
+        scania_extra_null_pct = df_scania['fuel_rate_per_hour'].isna().sum() / len(df_scania) * 100
+        print(f"  🏎️ [스카니아 2023.12~] {len(df_scania)}행")
+        print(f"    - 누적거리 Null 비율: {scania_cum_null_pct:.1f}% (낮아야 정상)")
+        print(f"    - 속도/시간 Null 비율: {scania_speed_null_pct:.1f}% (낮아야 정상)")
+        print(f"    - 전용컬럼(l/h) Null 비율: {scania_extra_null_pct:.1f}% (낮아야 정상)")
+        if scania_cum_null_pct > 20 or scania_speed_null_pct > 20 or scania_extra_null_pct > 20:
+            print("    🚨 스카니아 데이터에 필수 정보가 누락됨")
             issues += 1
 
     # ----------------------------------------------------------

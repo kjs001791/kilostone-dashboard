@@ -1,19 +1,36 @@
 services:
-  app:
+  api:
     build:
       context: .
-    image: kilostone:latest
-    container_name: kilostone-app
+      dockerfile: api/Dockerfile
+    image: kilostone-api:latest
+    container_name: kilostone-api
     restart: unless-stopped
-    expose:
-      - "8501"
+    ports:
+      - "8000:8000"
     env_file:
       - .env
+    environment:
+      DB_HOST: db
     depends_on:
       - db
     volumes:
       - ./data:/app/data
-      - ./config.yaml:/app/config.yaml:ro
+    networks:
+      - proxy-network
+      - kilostone-internal
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8000
+    image: kilostone-frontend:latest
+    container_name: kilostone-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
     networks:
       - proxy-network
       - kilostone-internal
@@ -35,6 +52,6 @@ services:
 
 networks:
   proxy-network:
-    external: true
+    driver: bridge
   kilostone-internal:
     driver: bridge

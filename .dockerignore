@@ -1,14 +1,28 @@
-mysql/
+# Python
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+.env
+.pytest_cache/
+.mypy_cache/
 
+# Node.js
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+
+# Data & DB
+mysql/
+data/raw/
+data/backups/
+data/staging/
+
+# Git
 .git/
 .gitignore
 
-__pycache__/
-*.pyc
-
-letsencrypt/
-data/
-__pycache__/
-*.pem
-
-scripts/legacy/
+# OS
+.DS_Store
+Thumbs.db

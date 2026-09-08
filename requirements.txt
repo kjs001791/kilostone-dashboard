@@ -1,23 +1,12 @@
-# Dashboard Framework
-streamlit
-watchdog
-
-# Data Processing
+# Data Processing (pipeline)
 pandas
 numpy
 pyarrow
 openpyxl
-et_xmlfile
 
 # Database
 pymysql
 sqlalchemy
-
-# Visualization
-plotly
-altair
-pydeck
-pillow
 
 # AI & Google
 google-generativeai
@@ -29,5 +18,9 @@ python-dotenv
 requests
 python-dateutil
 pytz
-streamlit-authenticator
-pyyaml
+
+# FastAPI Backend
+fastapi>=0.111.0
+uvicorn[standard]>=0.29.0
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4

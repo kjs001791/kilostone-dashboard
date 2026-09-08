@@ -41,19 +41,26 @@ for d in [RAW_DIR, STAGING_DIR, PROCESSED_DIR, BACKUP_DIR]:
 # =================================================================
 COLUMN_MAPPING = {
     'date': ['날짜', '일자'],
-    'fuel_efficiency': ['연비', '1일 평균연비', '1일평균연비', '평균연비', '연    비'],
-    'speed': ['평균 운행속도', '평균운행속도', '평균 운행 속도'],
-    'time': ['총 운행시간', '운행시간', '총 운행 시간'],
-    'distance': ['1일 주행거리', '1일주행거리', '총 운행거리', '운행거리'],
-    'cumulative_distance': ['총 주행거리', '총주행거리', '누적주행거리', '누적 운행거리'],
-    'consumed_fuel': ['연료 소모량', '1일 연료소모량', '소모량', '연료소모량'],
-    'refuel': ['연료주입량', '주입량', '연료 주입량'],
-    'reurea': ['요소수', '요소수주입', '요소수 주입량']
+    'fuel_efficiency': ['연비', '1일 평균연비', '1일평균연비', '평균연비', '연    비', 'km/l'],
+    'speed': ['평균 운행속도', '평균운행속도', '평균 운행 속도', 'km/h'],
+    'time': ['총 운행시간', '운행시간', '총 운행 시간', '구동시간_TOT', 'h(TOT)'],
+    'distance': ['1일 주행거리', '1일주행거리', '총 운행거리', '운행거리', 'km(주행)', '트립미터_TOT', '트립미터 TOT'],
+    'cumulative_distance': ['총 주행거리', '총주행거리', '누적주행거리', '누적 운행거리', 'km(누적)'],
+    'consumed_fuel': ['1일 연료소모량', '연료소모량', '연비개요_TOT', 'l(TOT)'],
+    'refuel': ['연료주입량', '주입량', '연료 주입량', '경유_TOT', 'l(경유)'],
+    'reurea': ['요소수_TOT', '요소수주입', '요소수 주입량', 'l(요소수)'],
+    # 스카니아 전용 컬럼 매핑
+    'fuel_rate_per_hour': ['l/h'],
+    'consumed_fuel_idle': ['연비개요_IDL', 'l(IDL)'],
+    'consumed_fuel_pto': ['연비개요_PTO', 'l(PTO)'],
+    'time_idle': ['구동시간_IDL', 'h(IDL)'],
+    'time_pto': ['구동시간_PTO', 'h(PTO)']
 }
 
 FINAL_COLUMNS = [
     'date', 'vehicle_id', 'fuel_efficiency', 'speed', 'time',
-    'distance', 'cumulative_distance', 'consumed_fuel', 'refuel', 'reurea'
+    'distance', 'cumulative_distance', 'consumed_fuel', 'refuel', 'reurea',
+    'fuel_rate_per_hour', 'consumed_fuel_idle', 'consumed_fuel_pto', 'time_idle', 'time_pto'
 ]
 
 
@@ -68,10 +75,10 @@ LIMITS = {
     'MAX_SPEED': 110,
     'MAX_DISTANCE': 1000,
     # Step5: 최종 검증용
-    'EFFICIENCY_MIN': 1.5,
-    'EFFICIENCY_MAX': 5.5,
-    'TIME_MAX_HOURS': 20,
-    'DIST_CALC_TOLERANCE': 0.20,
+    'EFFICIENCY_MIN': 1.0, # 1.5 -> 1.0 (대형차 고려 하향)
+    'EFFICIENCY_MAX': 6.0, # 5.5 -> 6.0
+    'TIME_MAX_HOURS': 22,
+    'DIST_CALC_TOLERANCE': 0.25,
 }
 
 
@@ -81,29 +88,37 @@ LIMITS = {
 SCHEMA_PERIODS = {
     "period_1": {
         "range": ("2016-01", "2017-05"),
+        "vehicle": "MAN TGX",
         "has_fuel": False,
         "has_speed_time": True,
         "has_cumulative": False,
         "notes": "연료/요소수 컬럼 없음, 시간에 '.' 사용",
     },
     "period_2": {
-        "range": ("2017-06", "2019-04"),
+        "range": ("2017-06", "2019-03"),
+        "vehicle": "MAN TGX",
         "has_fuel": True,
         "has_speed_time": True,
         "has_cumulative": False,
         "notes": "연료/요소수 추가, 요소수 단위 혼재 (1~9 = 이벤트 카운트)",
     },
     "period_3": {
-        "range": ("2019-05", "2020-12"),
+        "range": ("2019-04", "2023-11"),
+        "vehicle": "Daewoo Prima",
         "has_fuel": True,
         "has_speed_time": False,
         "has_cumulative": True,
-        "notes": "속도/시간 삭제, 누적거리 추가",
+        "notes": "속도/시간 삭제, 누적거리 추가 (대우프리마 전 기간)",
     },
-    # "period_4": {
-    #     "range": ("2021-01", "2025-12"),
-    #     "notes": "2021-2025 엑셀 구조 파악 후 추가",
-    # },
+    "period_4": {
+        "range": ("2023-12", "2099-12"),
+        "vehicle": "Scania",
+        "has_fuel": True,
+        "has_speed_time": True,
+        "has_cumulative": True,
+        "has_scania_extra": True,
+        "notes": "스카니아 전용 컬럼(IDL, PTO, l/h) 추가됨",
+    },
 }
 
 

@@ -1,24 +1,29 @@
 # 가상환경
 venv/
+.venv/
 
-# 실제 주행 기록 데이터
-data/
-
-# 개인 정보
+# 환경변수 / 보안
 .env
-
-# 컴파일된 바이트 코드
-__pycache__/
-
-config.yaml
-
-hash_gen.py
-
 aws-key.pem
 
-# ===== Pipeline staging (테스트 산출물) =====
-data/staging/*_TEST.*
-data/staging/*_TEST_*
+# 파이썬 캐시
+__pycache__/
+*.py[cod]
 
-# ===== staging 중간 파일 (선택: 정식 산출물도 제외하려면 아래 주석 해제) =====
-# data/staging/
+# 데이터 (로컬 전용)
+data/
+
+# DB 볼륨 (Docker)
+mysql/
+
+# Next.js
+frontend/.next/
+frontend/.env.local
+frontend/node_modules/
+
+# Claude Code
+.claude/
+
+# 기타
+.DS_Store
+Thumbs.db
