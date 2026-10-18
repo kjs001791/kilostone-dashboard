@@ -1,0 +1,438 @@
+{
+ "q1": {
+  "daewoo_rows": 1632,
+  "daewoo_files": 47,
+  "dates_in_multiple_files": 289,
+  "shared_by_year": {
+   "2020": 283,
+   "2021": 5,
+   "2022": 1
+  },
+  "max_files_per_shared_date": 2,
+  "files_with_shared_dates": 16,
+  "hub_file": {
+   "rows": 521,
+   "sheets": 20,
+   "years": [
+    2019,
+    2020
+   ]
+  },
+  "other_files_rows_quartiles": [
+   17.0,
+   26.0,
+   28.0
+  ],
+  "pairs": {
+   "total_pairs": 13,
+   "pairs_with_hub": 11,
+   "dates_in_hub_pairs": 283,
+   "dates_in_other_pairs": 6
+  },
+  "dup_dates_inside_hub_file": 0,
+  "hub_vs_monthly_dates": {
+   "date_identical_or_both_blank": 186,
+   "date_blank_on_one_side_only": 97,
+   "blank_direction:monthly_has_hub_blank": 97
+  },
+  "cells_blank_on_one_side_by_column": {
+   "fuel_efficiency": 97,
+   "distance": 97,
+   "cumulative_distance": 97,
+   "consumed_fuel": 97,
+   "refuel": 88,
+   "reurea": 52
+  },
+  "cells_with_conflicting_values_by_column": {},
+  "cum_level_diff_where_both_filled": {
+   "n": 148,
+   "buckets": {
+    "0": 148
+   }
+  },
+  "identical_dates_at_same_sheet_and_row_position": 0,
+  "chain_hub_file": {
+   "consecutive_pairs": 269,
+   "within_tol": 260,
+   "ratio": 0.9665
+  },
+  "chain_monthly_files_each_alone": {
+   "files": 11,
+   "consecutive_pairs": 186,
+   "within_tol": 180,
+   "ratio": 0.9677
+  },
+  "chain_merged_one_series": {
+   "consecutive_pairs": 348,
+   "within_tol": 337,
+   "ratio": 0.9684
+  },
+  "non_hub_shared_dates": {
+   "n_pairs": 2,
+   "different": 6,
+   "cum_level_diff_buckets_on_different": {
+    ">=10000km": 6
+   }
+  },
+  "hub_rows_with_all_measures_blank": 166,
+  "hub_rows_total": 521
+ },
+ "q2": {
+  "sheets_total": 853,
+  "driving_sheets_by_status": {
+   "no_data_row": 183,
+   "ok": 133,
+   "unknown_layout": 74
+  },
+  "quarantined": {
+   "n": 257,
+   "by_status": {
+    "no_data_row": 183,
+    "unknown_layout": 74
+   },
+   "files": 75
+  },
+  "quarantined_file_membership": {
+   "files_with_quarantined": 75,
+   "of_which_also_have_ok_driving_sheet": 73,
+   "files_only_quarantined": 2,
+   "files_only_ok": 1,
+   "sheets_per_quarantined_file_quartiles": [
+    1.0,
+    4.0,
+    5.0
+   ],
+   "single_sheet_files_among_quarantined": 14
+  },
+  "file_no_range": {
+   "quarantined": [
+    1,
+    75
+   ],
+   "ok": [
+    1,
+    76
+   ]
+  },
+  "features_p10_p50_p90": {
+   "quarantined": {
+    "rows": [
+     6.6,
+     32.0,
+     77.4
+    ],
+    "cols": [
+     6.0,
+     11.0,
+     17.0
+    ],
+    "n_share": [
+     0.222,
+     0.663,
+     0.734
+    ],
+    "s_share": [
+     0.167,
+     0.324,
+     0.778
+    ],
+    "d_share": [
+     0.0,
+     0.0,
+     0.112
+    ],
+    "date_col_pos": [
+     -1.0,
+     -1.0,
+     6.4
+    ],
+    "fill_density": [
+     0.177,
+     0.374,
+     0.58
+    ],
+    "n": 257
+   },
+   "driving_ok_all": {
+    "rows": [
+     25.0,
+     31.0,
+     35.0
+    ],
+    "cols": [
+     7.0,
+     9.0,
+     16.0
+    ],
+    "n_share": [
+     0.636,
+     0.789,
+     0.841
+    ],
+    "s_share": [
+     0.049,
+     0.067,
+     0.295
+    ],
+    "d_share": [
+     0.064,
+     0.117,
+     0.164
+    ],
+    "date_col_pos": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "fill_density": [
+     0.612,
+     0.753,
+     0.812
+    ],
+    "n": 133
+   },
+   "driving_ok_Daewoo": {
+    "rows": [
+     25.0,
+     31.0,
+     33.0
+    ],
+    "cols": [
+     8.0,
+     10.0,
+     10.0
+    ],
+    "n_share": [
+     0.762,
+     0.831,
+     0.845
+    ],
+    "s_share": [
+     0.048,
+     0.059,
+     0.075
+    ],
+    "d_share": [
+     0.103,
+     0.11,
+     0.154
+    ],
+    "date_col_pos": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "fill_density": [
+     0.562,
+     0.767,
+     0.812
+    ],
+    "n": 66
+   },
+   "driving_ok_Scania": {
+    "rows": [
+     21.8,
+     27.0,
+     33.0
+    ],
+    "cols": [
+     15.0,
+     16.0,
+     17.0
+    ],
+    "n_share": [
+     0.6,
+     0.639,
+     0.654
+    ],
+    "s_share": [
+     0.282,
+     0.295,
+     0.343
+    ],
+    "d_share": [
+     0.056,
+     0.064,
+     0.07
+    ],
+    "date_col_pos": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "fill_density": [
+     0.629,
+     0.702,
+     0.776
+    ],
+    "n": 27
+   },
+   "driving_ok_MAN": {
+    "rows": [
+     30.9,
+     32.0,
+     36.0
+    ],
+    "cols": [
+     7.0,
+     8.0,
+     9.0
+    ],
+    "n_share": [
+     0.755,
+     0.78,
+     0.809
+    ],
+    "s_share": [
+     0.059,
+     0.068,
+     0.086
+    ],
+    "d_share": [
+     0.131,
+     0.146,
+     0.167
+    ],
+    "date_col_pos": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "fill_density": [
+     0.621,
+     0.742,
+     0.819
+    ],
+    "n": 40
+   },
+   "revenue": {
+    "rows": [
+     13.7,
+     32.0,
+     87.0
+    ],
+    "cols": [
+     6.0,
+     11.0,
+     17.0
+    ],
+    "n_share": [
+     0.222,
+     0.676,
+     0.812
+    ],
+    "s_share": [
+     0.079,
+     0.266,
+     0.778
+    ],
+    "d_share": [
+     0.0,
+     0.059,
+     0.149
+    ],
+    "date_col_pos": [
+     -1.0,
+     0.0,
+     0.0
+    ],
+    "fill_density": [
+     0.178,
+     0.365,
+     0.77
+    ],
+    "n": 448
+   },
+   "maintenance": {
+    "rows": [
+     3.6,
+     22.0,
+     89.0
+    ],
+    "cols": [
+     0.4,
+     8.0,
+     20.8
+    ],
+    "n_share": [
+     0.0,
+     0.0,
+     0.393
+    ],
+    "s_share": [
+     0.002,
+     0.683,
+     1.0
+    ],
+    "d_share": [
+     0.0,
+     0.0,
+     0.222
+    ],
+    "date_col_pos": [
+     -1.0,
+     -1.0,
+     1.6
+    ],
+    "fill_density": [
+     0.161,
+     0.488,
+     1.0
+    ],
+    "n": 15
+   }
+  },
+  "knn5_nearest_group_of_quarantined": {
+   "revenue": 257
+  },
+  "knn5_family": {
+   "revenue": 257
+  },
+  "loo_driving_sheets_classified_as_driving": {
+   "tested": 133,
+   "correct": 70
+  },
+  "loo_revenue_sheets_classified_as_revenue": {
+   "tested": 150,
+   "correct": 123
+  },
+  "quarantined_shape": {
+   "date_cells_per_sheet_quartiles": [
+    0.0,
+    0.0,
+    25.400000000000006
+   ],
+   "date_col_pos_counts": {
+    "-1": 156,
+    "0": 74,
+    "9": 22,
+    "8": 3,
+    "6": 1
+   },
+   "n_date_cols_counts": {
+    "0": 156,
+    "2": 47,
+    "1": 44,
+    "3": 8,
+    "4": 2
+   },
+   "sheets_with_1plus_numeric_share_over_0.3": 174
+  }
+ },
+ "q2_signature": {
+  "quarantined_distinct_signatures": 33,
+  "quarantined_top_signature_share": 0.206,
+  "quarantined_sheets_with_signature_also_in_revenue": 257,
+  "quarantined_sheets_with_signature_also_in_driving_ok": 4,
+  "quarantined_sheets_with_signature_in_neither": 0,
+  "revenue_sheets_total": 448
+ },
+ "q2_extra": {
+  "driving_files": 76,
+  "revenue_files": 81,
+  "driving_files_byte_identical_to_a_revenue_file": 75,
+  "no_data_row sheets: most common cell kind under date label = text": 96,
+  "no_data_row sheets with 3+ numeric columns": 98,
+  "no_data_row sheets: most common cell kind under date label = blank": 87
+ }
+}

@@ -1,0 +1,199 @@
+﻿row_id,column,error_type,clean_value,dirty_value
+137,date,date_abnormal,2016-06-01 00:00:00,1900-06-01 00:00:00
+155,date,date_abnormal,2016-06-21 00:00:00,1900-06-21 00:00:00
+236,date,date_abnormal,2016-09-21 00:00:00,1900-09-21 00:00:00
+246,date,date_abnormal,2016-10-01 00:00:00,2203-10-01 00:00:00
+314,date,date_abnormal,2016-12-17 00:00:00,1900-12-17 00:00:00
+425,date,date_abnormal,2017-04-27 00:00:00,2203-04-27 00:00:00
+599,date,date_abnormal,2017-10-31 00:00:00,2092-10-31 00:00:00
+710,date,date_abnormal,2018-03-08 00:00:00,1902-03-08 00:00:00
+843,date,date_abnormal,2018-08-07 00:00:00,1900-08-07 00:00:00
+872,date,date_abnormal,2018-09-05 00:00:00,2203-09-05 00:00:00
+1014,date,date_abnormal,2019-02-12 00:00:00,2203-02-12 00:00:00
+1028,date,date_abnormal,2019-03-01 00:00:00,2203-03-01 00:00:00
+1103,distance,copy_previous,301.4,0.0
+1114,cumulative_distance,digit_drop,52318.0,5218.0
+1144,distance,adjacent_key,355.9,555.9
+1159,date,date_abnormal,2019-07-24 00:00:00,1900-07-24 00:00:00
+1171,distance,transpose,140.7,410.7
+1175,distance,copy_previous,211.5,0.0
+1187,cumulative_distance,digit_drop,65790.0,5790.0
+1197,cumulative_distance,transpose,68275.0,68725.0
+1202,cumulative_distance,adjacent_key,69160.0,69560.0
+1208,cumulative_distance,digit_drop,70567.0,7056.0
+1214,distance,two_cells,361.6,36.6
+1214,cumulative_distance,two_cells,72025.0,7225.0
+1218,distance,copy_previous,252.2,0.0
+1224,cumulative_distance,digit_drop,74657.0,7465.0
+1256,distance,copy_previous,246.2,301.4
+1263,cumulative_distance,copy_previous,82432.0,82111.0
+1278,distance,digit_drop,180.0,18.0
+1284,date,date_abnormal,2019-12-13 00:00:00,2203-12-13 00:00:00
+1288,distance,copy_previous,336.9,265.8
+1304,cumulative_distance,adjacent_key,91318.0,51318.0
+1310,distance,digit_drop,290.3,29.0
+1328,distance,two_cells,283.0,28.0
+1328,cumulative_distance,two_cells,96141.0,69141.0
+1337,cumulative_distance,digit_drop,97653.0,9653.0
+1348,cumulative_distance,digit_drop,100123.0,10013.0
+1360,date,date_abnormal,2020-03-09 00:00:00,1900-03-09 00:00:00
+1364,date,date_abnormal,2020-03-17 00:00:00,2092-03-17 00:00:00
+1377,cumulative_distance,copy_previous,106276.0,105889.0
+1386,cumulative_distance,adjacent_key,108521.0,105521.0
+1402,distance,transpose,213.5,215.3
+1421,date,date_abnormal,2020-05-20 00:00:00,2203-05-20 00:00:00
+1450,distance,adjacent_key,246.0,256.0
+1456,distance,two_cells,285.3,283.5
+1456,cumulative_distance,two_cells,122448.0,124248.0
+1473,distance,two_cells,199.1,191.9
+1473,cumulative_distance,two_cells,126176.0,216176.0
+1483,distance,transpose,175.6,715.6
+1488,cumulative_distance,copy_previous,129450.0,129111.0
+1502,distance,two_cells,222.0,220.2
+1502,cumulative_distance,two_cells,133065.0,133035.0
+1527,distance,digit_drop,306.6,30.6
+1537,cumulative_distance,adjacent_key,140655.0,440655.0
+1542,cumulative_distance,transpose,141856.0,148156.0
+1548,distance,two_cells,281.5,381.5
+1548,cumulative_distance,two_cells,143009.0,14300.0
+1552,distance,copy_previous,331.5,169.0
+1557,cumulative_distance,digit_drop,145043.0,14543.0
+1566,cumulative_distance,digit_drop,146970.0,14670.0
+1572,distance,adjacent_key,190.7,180.7
+1583,distance,digit_drop,262.2,62.2
+1597,distance,digit_drop,187.1,18.7
+1624,distance,two_cells,152.1,512.1
+1624,cumulative_distance,two_cells,157922.0,155922.0
+1644,distance,adjacent_key,155.9,153.9
+1683,distance,copy_previous,312.6,130.5
+1687,cumulative_distance,copy_previous,170363.0,170143.0
+1692,cumulative_distance,transpose,171582.0,117582.0
+1720,distance,transpose,165.6,615.6
+1769,distance,copy_previous,172.4,294.7
+1785,distance,digit_drop,312.6,31.2
+1798,distance,adjacent_key,280.1,260.1
+1806,cumulative_distance,adjacent_key,194882.0,194872.0
+1816,cumulative_distance,digit_drop,196234.0,19624.0
+1831,cumulative_distance,transpose,199542.0,199452.0
+1840,cumulative_distance,digit_drop,201811.0,21811.0
+1851,distance,copy_previous,307.7,215.7
+1855,cumulative_distance,adjacent_key,204112.0,204012.0
+1868,date,date_abnormal,2021-10-20 00:00:00,1902-10-20 00:00:00
+1887,distance,digit_drop,177.7,17.7
+1904,cumulative_distance,transpose,214039.0,214093.0
+1928,cumulative_distance,copy_previous,218206.0,218070.0
+1934,cumulative_distance,transpose,219411.0,129411.0
+1954,distance,two_cells,259.1,59.1
+1954,cumulative_distance,two_cells,224066.0,224606.0
+1966,distance,copy_previous,95.6,143.7
+1975,cumulative_distance,digit_drop,228437.0,22837.0
+1979,cumulative_distance,adjacent_key,228840.0,228880.0
+1984,distance,copy_previous,291.0,0.0
+1988,cumulative_distance,copy_previous,230517.0,230268.0
+1999,cumulative_distance,digit_drop,232924.0,22924.0
+2005,cumulative_distance,digit_drop,234097.0,23497.0
+2010,cumulative_distance,adjacent_key,235361.0,235331.0
+2015,distance,transpose,207.5,27.5
+2024,cumulative_distance,adjacent_key,238073.0,238273.0
+2032,date,date_abnormal,2022-04-26 00:00:00,1902-04-26 00:00:00
+2048,date,date_abnormal,2022-05-15 00:00:00,1900-05-15 00:00:00
+2063,distance,two_cells,341.9,314.9
+2063,cumulative_distance,two_cells,245479.0,24547.0
+2068,distance,two_cells,312.7,302.7
+2068,cumulative_distance,two_cells,246893.0,264893.0
+2096,cumulative_distance,adjacent_key,254007.0,254107.0
+2105,cumulative_distance,digit_drop,256569.0,25669.0
+2146,distance,two_cells,245.7,445.7
+2146,cumulative_distance,two_cells,265457.0,25457.0
+2151,distance,copy_previous,0.0,419.0
+2214,distance,digit_drop,266.2,26.2
+2227,cumulative_distance,copy_previous,283234.0,282940.0
+2240,distance,copy_previous,220.9,274.9
+2250,cumulative_distance,digit_drop,288421.0,88421.0
+2255,distance,two_cells,378.4,78.4
+2255,cumulative_distance,two_cells,289563.0,28956.0
+2272,cumulative_distance,adjacent_key,293552.0,253552.0
+2305,cumulative_distance,transpose,300715.0,307015.0
+2318,cumulative_distance,digit_drop,303426.0,30326.0
+2337,distance,two_cells,213.8,253.8
+2337,cumulative_distance,two_cells,306859.0,36859.0
+2346,cumulative_distance,digit_drop,308460.0,30860.0
+2358,distance,copy_previous,335.3,311.6
+2381,distance,digit_drop,277.1,27.1
+2390,distance,two_cells,412.2,142.2
+2390,cumulative_distance,two_cells,318616.0,316816.0
+2398,cumulative_distance,digit_drop,319898.0,39898.0
+2403,cumulative_distance,transpose,321121.0,312121.0
+2410,distance,adjacent_key,114.7,414.7
+2448,distance,digit_drop,284.2,84.2
+2457,cumulative_distance,digit_drop,332605.0,33260.0
+2465,cumulative_distance,digit_drop,334444.0,33444.0
+2491,cumulative_distance,digit_drop,339825.0,39825.0
+2507,cumulative_distance,adjacent_key,343228.0,243228.0
+2526,distance,copy_previous,253.4,181.9
+2534,distance,copy_previous,302.5,220.4
+2567,distance,transpose,262.7,622.7
+2573,distance,copy_previous,0.0,283.2
+2591,distance,transpose,394.4,349.4
+2597,distance,digit_drop,203.6,20.6
+2604,cumulative_distance,copy_previous,392289.0,392148.0
+2611,cumulative_distance,adjacent_key,393184.0,392184.0
+2618,distance,adjacent_key,353.2,356.2
+2630,cumulative_distance,adjacent_key,397028.0,398028.0
+2637,cumulative_distance,transpose,398527.0,938527.0
+2644,date,date_abnormal,2024-03-12 00:00:00,1900-03-12 00:00:00
+2681,cumulative_distance,digit_drop,408467.0,48467.0
+2703,cumulative_distance,copy_previous,412941.0,412507.0
+2718,cumulative_distance,adjacent_key,416570.0,416580.0
+2736,cumulative_distance,adjacent_key,419637.0,219637.0
+2744,distance,digit_drop,341.0,34.1
+2757,cumulative_distance,digit_drop,423870.0,42870.0
+2788,cumulative_distance,adjacent_key,430714.0,432714.0
+2800,distance,copy_previous,236.5,310.0
+2806,distance,digit_drop,143.5,13.5
+2812,date,date_abnormal,2024-09-18 00:00:00,2203-09-18 00:00:00
+2826,distance,copy_previous,269.1,424.5
+2863,cumulative_distance,adjacent_key,446641.0,446941.0
+2877,distance,digit_drop,173.5,17.5
+2904,distance,transpose,221.1,212.1
+2928,distance,adjacent_key,137.5,537.5
+2934,distance,two_cells,379.8,39.8
+2934,cumulative_distance,two_cells,461445.0,461475.0
+2947,distance,digit_drop,219.4,21.4
+2955,cumulative_distance,digit_drop,465638.0,46563.0
+2974,distance,digit_drop,238.1,23.8
+2981,cumulative_distance,transpose,471930.0,471903.0
+2986,cumulative_distance,adjacent_key,472947.0,452947.0
+2992,distance,digit_drop,214.6,14.6
+3005,distance,transpose,262.9,622.9
+3009,distance,transpose,185.1,815.1
+3025,cumulative_distance,adjacent_key,481598.0,481595.0
+3029,distance,transpose,257.9,275.9
+3042,cumulative_distance,digit_drop,485352.0,45352.0
+3047,distance,two_cells,239.6,39.6
+3047,cumulative_distance,two_cells,486611.0,48661.0
+3064,distance,digit_drop,229.4,22.4
+3079,cumulative_distance,transpose,494875.0,494785.0
+3090,distance,copy_previous,0.0,269.5
+3097,distance,copy_previous,0.0,211.7
+3111,date,date_abnormal,2025-08-17 00:00:00,1900-08-17 00:00:00
+3119,distance,digit_drop,385.6,38.5
+3124,distance,two_cells,273.0,27.3
+3124,cumulative_distance,two_cells,504823.0,540823.0
+3134,date,date_abnormal,2025-09-14 00:00:00,2203-09-14 00:00:00
+3145,cumulative_distance,adjacent_key,509244.0,509224.0
+3157,distance,digit_drop,319.5,31.5
+3161,distance,two_cells,324.4,234.4
+3161,cumulative_distance,two_cells,512322.0,51222.0
+3173,distance,adjacent_key,359.7,355.7
+3183,distance,adjacent_key,174.6,274.6
+3214,distance,adjacent_key,243.7,223.7
+3227,distance,two_cells,232.4,234.2
+3227,cumulative_distance,two_cells,525607.0,525670.0
+3235,distance,digit_drop,234.0,34.0
+3239,date,date_abnormal,2026-01-11 00:00:00,2203-01-11 00:00:00
+3248,distance,transpose,326.1,362.1
+3261,distance,transpose,166.0,616.0
+3265,distance,adjacent_key,291.4,294.4
+3272,distance,copy_previous,385.7,199.7
+3300,cumulative_distance,copy_previous,541585.0,541395.0

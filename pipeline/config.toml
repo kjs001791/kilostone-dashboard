@@ -1,0 +1,19 @@
+# Paths are relative to the repository root. Raw paths are read only from here.
+[paths]
+raw_dir = "data/raw"
+parsed_dir = "data/parsed"
+review_dir = "data/review"
+profile_dir = "pipeline/profiles"
+reports_dir = "reports"
+fixtures_dir = "tests/fixtures"
+
+[raw_subfolders]
+# first existing name in each list is used
+driving = ["driving", "driving_log"]
+revenue = ["revenue"]
+maintenance = ["maintenance"]
+
+[seeds]
+dev = 20261018
+test = 7340918  # third test set (round 3). Earlier ones were scored once and are retired: 77031 (round 1), 5120311 (round 2).
+real_inject = 4242

@@ -1,0 +1,65 @@
+{
+ "driving_files": 76,
+ "revenue_files": 81,
+ "driving_files_with_identical_revenue_file": 75,
+ "driving_files_without_revenue_copy": 1,
+ "revenue_only_files": 6,
+ "shared_files": 75,
+ "rows_with_date_only_side": 11505,
+ "rows_with_date_shared_side": 12220,
+ "table_kinds_only_side": 3,
+ "table_kinds_shared_side": 4,
+ "table_kinds_in_both": 1,
+ "keys_only_side": 1745,
+ "keys_shared_side": 3713,
+ "keys_in_both": 24,
+ "dates_in_both": 24,
+ "keys_compared_cellwise": 0,
+ "keys_with_several_rows": 24,
+ "cells": {
+  "same": 0,
+  "different": 0,
+  "one_side_empty": 0,
+  "both_empty": 0
+ },
+ "multi_row_keys": {
+  "sum_same": 24,
+  "sum_different": 0
+ },
+ "last_date_gap_days_by_table_kind(only_side minus shared_side)": {
+  "matrix": -2006
+ },
+ "last_date_gap_days_overall": -2006,
+ "only_side_dates_not_in_shared": 1550,
+ "only_side_dates_after_shared_last": 0,
+ "matrix_keys_only_side": 4154,
+ "matrix_keys_shared_side": 3441,
+ "matrix_keys_in_both": 7,
+ "matrix_values_same": 6,
+ "matrix_values_different": 1,
+ "matrix_dates_in_both": 24,
+ "matrix_last_date_gap_days": -2006,
+ "sheets_only_side_by_status": {
+  "matrix": 72,
+  "ok": 45,
+  "no_header": 1
+ },
+ "rows_only_side": {
+  "source_rows": 8314,
+  "loaded": 6304,
+  "quarantined": 19,
+  "skipped_driving": 0
+ },
+ "sheets_shared_side_by_status": {
+  "ok": 189,
+  "skipped_driving": 73,
+  "matrix": 66,
+  "no_header": 2
+ },
+ "rows_shared_side": {
+  "source_rows": 12758,
+  "loaded": 8946,
+  "quarantined": 58,
+  "skipped_driving": 2327
+ }
+}
