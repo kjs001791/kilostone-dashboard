@@ -35,7 +35,7 @@ def test_reconciliation_has_no_mismatch(rev, mnt):
     assert mnt["recon"]["balanced"].all()
     r = rev["recon"]
     assert (r["source_rows"] == r[["loaded", "excluded_blank", "excluded_total", "excluded_header", "skipped_driving", "summary_rows",
-                                   "quarantined"]].sum(axis=1)).all()
+                                   "excluded_footer", "quarantined"]].sum(axis=1)).all()
 
 
 def test_expected_row_classes(rev):
@@ -155,3 +155,65 @@ def test_summary_sheet_confirmed_only_when_numbers_match(rev):
     assert (f[(f.source_file_no == 4) & (f.source_sheet_no == 3)]["table_kind"] == "summary").all()
     u = _sheet(rev, 4)
     assert u["status"] == "no_header" and u["reason"] == "머리글 없음" and u["quarantined"] == u["source_rows"]
+
+
+def test_wide_sheet_tail_lines_price_rows_and_rowsum(rev):
+    r = _sheet(rev, 5)
+    assert r["status"] == "matrix" and r["balanced"]
+    assert r["excluded_footer"] == 9 and r["excluded_total"] == 1
+    f = rev["frame"]
+    m = f[(f.source_file_no == 4) & (f.source_sheet_no == 5)]
+    # (a) no date-level record from the total row or tail lines
+    assert (m["source_row_no"] < 82).all()
+    # (c) the row-sum column makes no record, and its cells agree with the client cells
+    ex = [json.loads(x) for x in m["extra"]]
+    assert all(e["col"] != 8 for e in ex)
+    st = rev["stats"]
+    assert st["rowsum_checked"] == 77 and st["rowsum_mismatch"] == 0 and st["footer_unknown"] == 0
+    # (d) client and kilograms are standard columns
+    cl = m[m["client"].notna()]
+    assert set(cl["client"]) == set(md.MX_CLIENTS)
+    assert cl["weight_kg"].notna().all()
+    for rec, e in zip(m.itertuples(), ex):
+        if e["outside_label"]:
+            assert rec.client is None or rec.client != rec.client
+            assert rec.weight_kg != rec.weight_kg  # NaN
+        else:
+            assert rec.client == e["header"] and rec.weight_kg == e["value"]
+    assert m["date"].notna().all()
+    # (b) price rows: clients x 3 blocks
+    p = rev["price"]
+    p = p[(p.source_file_no == 4) & (p.source_sheet_no == 5)]
+    assert len(p) == 6 * 3
+    assert set(p["price_basis"]) == {"company", "invoice", "diff"}
+    for i, name in enumerate(md.MX_CLIENTS):
+        assert p[(p.client == name) & (p.price_basis == "company")]["unit_price"].iloc[0] == md.MX_PRICE_COMPANY[i]
+        assert p[(p.client == name) & (p.price_basis == "invoice")]["unit_price"].iloc[0] == md.MX_PRICE_INVOICE[i]
+    assert set(p["year_month"]) == {"2020-01"}
+    assert p[p.price_basis == "diff"]["total_amount"].notna().all()
+    assert json.loads(p[p.price_basis == "diff"]["source_row_nos"].iloc[0]) == [94]
+
+
+def test_console_prints_no_tail_text(fixtures, capsys):
+    res = pr.parse_kind(fixtures / "revenue", "revenue")
+    for line in pr.report_lines("revenue", res):
+        print(line)
+    out = capsys.readouterr().out
+    assert "row-sum check" in out and "ZZMX" not in out
+
+
+def test_line_item_header_stays_on_table_path():
+    """A header that maps line-item words (quantity, unit price, supply amount, VAT) is a table, even when its
+    other labels and dated rows would also pass the horizontal test. Only a corner cell and a row-sum column
+    send a sheet to the horizontal parser first."""
+    import pandas as pd
+
+    from pipeline.revenue_common import parse_table_sheet
+
+    head = ["거래처", "가나상사", "다라물산", "수량", "단가", "공급가액", "부가세"]
+    body = [[pd.Timestamp(2020, 1, d), 1000 + d, 2000 + d, 3, 10, 30, 3] for d in range(1, 11)]
+    df = pd.DataFrame([head] + body, dtype=object)
+    rows, counts, info = parse_table_sheet("revenue", df, 1, 1, "h", "revenue")
+    assert info["status"] == "ok"
+    assert info["table_kind"] != "matrix"
+    assert {"quantity", "unit_price", "supply_amount", "vat"} <= set(info["mapped"])

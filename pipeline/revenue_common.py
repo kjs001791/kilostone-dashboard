@@ -49,10 +49,10 @@ MAINTENANCE_RULES = [
     ("note", ["비고", "적요", "메모"]),
 ]
 RULES = {"revenue": REVENUE_RULES, "maintenance": MAINTENANCE_RULES}
-NUMERIC_STD = {"unit_price", "supply_amount", "vat", "total_amount", "amount", "weight_ton", "quantity", "trips",
-               "odometer_km", "cost"}
+NUMERIC_STD = {"unit_price", "supply_amount", "vat", "total_amount", "amount", "weight_ton", "weight_kg", "quantity",
+               "trips", "odometer_km", "cost"}
 STD_COLS = {
-    "revenue": ["date", "vehicle", "client", "origin", "destination", "item", "quantity", "weight_ton", "trips",
+    "revenue": ["date", "vehicle", "client", "origin", "destination", "item", "quantity", "weight_ton", "weight_kg", "trips",
                 "unit_price", "amount", "supply_amount", "vat", "total_amount", "note"],
     "maintenance": ["date", "vehicle", "item", "shop", "quantity", "unit_price", "cost", "odometer_km", "note"],
 }
@@ -61,9 +61,15 @@ MIN_HITS = {"revenue": 2, "maintenance": 1}
 SCAN_ROWS = 40
 FILL_STD = {"date", "client", "origin", "destination", "item", "vehicle"}
 MAX_HEADER_EXTRA = 2
+# standard words a horizontal sheet's header row can map: the corner cell and the row-sum column
+MATRIX_HEADER_STD = {"client", "date", "shop", "total_amount"}
 
 _BASE = {kind: {w for _, words in rules for w in words} for kind, rules in RULES.items()}
-ALLOW_WORDS = sorted(set().union(*_BASE.values()), key=lambda w: (-len(w), w))
+# footer words of horizontal sheets: printable, but kept out of REVENUE_RULES so that map_std is unchanged
+FOOTER_WORDS = {"회사받은금액", "청구한금액", "차이금액", "회사인정", "발행단가"}
+ALLOW_WORDS = sorted(set().union(*_BASE.values()) | FOOTER_WORDS, key=lambda w: (-len(w), w))
+PRICE_COLS = ["source_folder", "source_file_no", "source_sheet_no", "file_hash", "year_month", "client", "price_basis",
+              "unit_price", "supply_amount", "vat", "total_amount", "source_row_nos"]
 
 
 def _flat(kind: str):
@@ -269,11 +275,14 @@ def parse_table_sheet(kind: str, df: pd.DataFrame, file_no: int, sheet_no: int, 
     hr = find_header_row(kind, rows)
     hdr = build_header(kind, rows, hr, ncol) if hr is not None else None
     colmap, keys = header_columns(kind, hdr, ncol) if hdr else ({}, [])
-    if not colmap:
+    # a horizontal sheet also maps a few standard words in its header row (corner cell, row-sum column), so the
+    # matrix test runs first when those are the only mapped words; a header with line-item words stays a table
+    if set(colmap) <= MATRIX_HEADER_STD:
         mx = parse_matrix_sheet(kind, rows, ncol, active, merged or [], file_no, sheet_no, fhash, folder, sheet_name,
                                 file_name)
         if mx is not None:
             return mx
+    if not colmap:
         info["status"] = "no_header"
         counts["quarantined"] = len(rows)
         return [], counts, info
@@ -430,11 +439,24 @@ def parse_matrix_sheet(kind, rows, ncol, active, merged, file_no, sheet_no, fhas
     counts = Counter({"source": len(rows), "header": hend})
     info = {"status": "matrix", "mapped": [], "extra_keys": Counter(), "bad_cells": Counter(), "has_date": True,
             "table_kind": "matrix", "day_only": Counter(), "merged_fill": 0, "sumcols": Counter(), "records": 0,
-            "labels": len(labels), "zero_dropped": 0}
+            "labels": len(labels), "zero_dropped": 0, "rowsum_checked": 0, "rowsum_mismatch": 0, "footer_unknown": 0,
+            "price_rows": []}
+    # label columns whose header is a standard word other than client (the row-sum column) are checked, not unpivoted
+    std_cols = {cc for cc, t in colkey.items() if map_std(kind, t) not in (None, "client")}
+    client_cols = label_cols - std_cols
+    rowsum_col = None
+    for cc in sorted(std_cols):
+        if map_std(kind, colkey[cc]) == "total_amount":
+            rowsum_col = cc
+            break
+    if rowsum_col is None and std_cols:
+        rowsum_col = min(std_cols)
     pre = " ".join(str(v) for rr in rows[:r0] for v in rr if not is_empty(v))
     ym, ym_src = infer_ym(pre, sheet_name, file_name)
     out = []
+    footer = []  # (row index, name without whitespace, row)
     cur, basis = None, ""
+    total_seen = False
     for r in range(hend, len(rows)):
         row = rows[r]
         if n_filled(row) == 0:
@@ -442,12 +464,17 @@ def parse_matrix_sheet(kind, rows, ncol, active, merged, file_no, sheet_no, fhas
             continue
         if is_total_row(row, ncol):
             counts["total"] += 1
+            total_seen = True
             continue
         v0 = row[c0]
         row_label = None
         if not is_empty(v0):
             d, k = parse_date(v0)
             dm = _DAY_ONLY.match(v0) if isinstance(v0, str) else None
+            if total_seen and isinstance(v0, str) and k != "ok" and dm is None:
+                footer.append((r, re.sub(r"\s+", "", v0), row))  # tail lines under the total row
+                counts["footer"] += 1
+                continue
             if k == "ok":
                 cur, basis = d.date().isoformat(), "cell"
             elif dm and ym:
@@ -458,9 +485,14 @@ def parse_matrix_sheet(kind, rows, ncol, active, merged, file_no, sheet_no, fhas
                     cur, basis = None, ""
             else:
                 row_label = json_value(v0)
+        if rowsum_col is not None and _num(row[rowsum_col]):
+            part = sum(float(row[cc]) for cc in client_cols if _num(row[cc]))
+            info["rowsum_checked"] += 1
+            if abs(part - float(row[rowsum_col])) > 1:
+                info["rowsum_mismatch"] += 1
         n_before = len(out)
         for c in active:
-            if c == c0 or is_empty(row[c]):
+            if c == c0 or c in std_cols or is_empty(row[c]):
                 continue
             v = row[c]
             if _num(v) and float(v) == 0.0 and c not in label_cols:
@@ -470,15 +502,54 @@ def parse_matrix_sheet(kind, rows, ncol, active, merged, file_no, sheet_no, fhas
             extra = {"header": key, "value": json_value(v), "col": c + 1, "outside_label": c not in label_cols}
             if row_label is not None:
                 extra["row_label"] = row_label
+            is_client = c in client_cols
             out.append({"source_folder": folder, "source_file_no": file_no, "source_sheet_no": sheet_no,
                         "source_row_no": r + 1, "file_hash": fhash, "table_kind": "matrix", "date": cur,
-                        "date_basis": (basis if cur else ""), "extra": json.dumps(extra, ensure_ascii=False)})
+                        "date_basis": (basis if cur else ""), "client": key if is_client else None,
+                        "weight_kg": float(v) if is_client and _num(v) else None,
+                        "extra": json.dumps(extra, ensure_ascii=False)})
             info["extra_keys"][safe_label(key)] += 1
         if len(out) > n_before:
             counts["loaded"] += 1
         else:
             counts["blank"] += 1
     info["records"] = len(out)
+    months = Counter(rec["date"][:7] for rec in out if rec["date"])
+    ymonth = months.most_common(1)[0][0] if months else None
+    # footer blocks: price line starts a block; the amount lines under it belong to it
+    blocks = []
+    for r, name, row in footer:
+        if name.startswith("단가(회사인정)"):
+            blocks.append({"basis": "company", "lines": {"unit_price": (r, row)}})
+        elif name.startswith("단가(발행단가)"):
+            blocks.append({"basis": "invoice", "lines": {"unit_price": (r, row)}})
+        elif name == "차이금액":
+            blocks.append({"basis": "diff", "lines": {"total_amount": (r, row)}})
+        else:
+            field = {"공급가액": "supply_amount", "부가세": "vat"}.get(name)
+            if name == "회사받은금액" and blocks and blocks[-1]["basis"] == "company":
+                field = "total_amount"
+            if name == "청구한금액" and blocks and blocks[-1]["basis"] == "invoice":
+                field = "total_amount"
+            if field and blocks and blocks[-1]["basis"] != "diff" and field not in blocks[-1]["lines"]:
+                blocks[-1]["lines"][field] = (r, row)
+            else:
+                info["footer_unknown"] += 1
+    for blk in blocks:
+        for (a, b), (_, text) in zip(spans, labels):
+            if a not in client_cols:
+                continue
+            rec = {"source_folder": folder, "source_file_no": file_no, "source_sheet_no": sheet_no,
+                   "file_hash": fhash, "year_month": ymonth, "client": text, "price_basis": blk["basis"]}
+            for f in ("unit_price", "supply_amount", "vat", "total_amount"):
+                rec[f] = None
+                if f in blk["lines"]:
+                    vals = [x for x in blk["lines"][f][1][a:b + 1] if _num(x)]
+                    rec[f] = float(vals[0]) if vals else None
+            if all(rec[f] is None for f in ("unit_price", "supply_amount", "vat", "total_amount")):
+                continue
+            rec["source_row_nos"] = json.dumps(sorted(r + 1 for r, _ in blk["lines"].values()))
+            info["price_rows"].append(rec)
     return out, counts, info
 
 
@@ -517,4 +588,5 @@ def summary_rows(rows, file_no, sheet_no, fhash, folder):
 
 def reconciled(counts: Counter) -> bool:
     return counts["source"] == (counts["loaded"] + counts["blank"] + counts["total"] + counts["header"]
-                                + counts["skipped_driving"] + counts["summary"] + counts["quarantined"])
+                                + counts["skipped_driving"] + counts["summary"] + counts["footer"]
+                                + counts["quarantined"])

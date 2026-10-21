@@ -2,7 +2,7 @@
 
 - Byte-identical files are read once (hash groups); the file correspondence table is written next to the output.
 - Sheets that parse as driving-log sheets are skipped (they live in driving.csv).
-- Reconciliation per sheet: source rows = loaded + blank + total + header + skipped_driving + quarantined.
+- Reconciliation per sheet: source rows = loaded + blank + total + header + skipped_driving + summary + footer + quarantined.
 Console output: counts and allow-listed words only. Values, coordinates, sheet names and other header text stay out.
 """
 from __future__ import annotations
@@ -19,14 +19,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from pipeline.common import list_excel, load_config, path_from, raw_subdir, write_csv  # noqa: E402
 from pipeline.parse_driving import parse_sheet as parse_driving_sheet  # noqa: E402
 from pipeline.revenue_common import (  # noqa: E402
-    KEY_COLS, STD_COLS, group_by_hash, match_ratio, parse_table_sheet, reconciled, safe_label, sheet_numbers,
+    KEY_COLS, PRICE_COLS, STD_COLS, group_by_hash, match_ratio, parse_table_sheet, reconciled, safe_label, sheet_numbers,
     summary_rows,
 )
 
 warnings.filterwarnings("ignore")
 
 RECON_COLS = ["source_folder", "source_file_no", "source_sheet_no", "file_hash", "status", "source_rows", "loaded",
-              "excluded_blank", "excluded_total", "excluded_header", "skipped_driving", "summary_rows", "quarantined", "photos",
+              "excluded_blank", "excluded_total", "excluded_header", "skipped_driving", "summary_rows", "excluded_footer", "quarantined", "photos",
               "records", "merged_fill_cells", "reason", "balanced"]
 
 
@@ -84,7 +84,8 @@ def parse_kind(folder: Path, kind: str, folder_name: str | None = None, with_pic
              "table_kind": Counter(), "day_only": Counter(), "files": len(files), "unique_files": len(set(canon)), "sheets_read": 0,
              "sheets_with_date": 0, "unreadable": Counter(), "merged_fill": 0, "merged_fill_sheets": 0,
              "matrix_sheets": 0, "matrix_records": 0, "matrix_labels": 0, "zero_dropped": 0, "summary_sheets": 0,
-             "summary_rows": 0, "summary_checks": []}
+             "summary_rows": 0, "summary_checks": [], "rowsum_checked": 0, "rowsum_mismatch": 0, "footer_unknown": 0}
+    price_rows = []
     filemap = []
     for fno, f in enumerate(files, start=1):
         dup_of = canon[fno - 1] if canon[fno - 1] != fno else ""
@@ -147,6 +148,10 @@ def parse_kind(folder: Path, kind: str, folder_name: str | None = None, with_pic
                 stats["matrix_records"] += info["records"]
                 stats["matrix_labels"] += info["labels"]
                 stats["zero_dropped"] += info["zero_dropped"]
+                stats["rowsum_checked"] += info["rowsum_checked"]
+                stats["rowsum_mismatch"] += info["rowsum_mismatch"]
+                stats["footer_unknown"] += info["footer_unknown"]
+                price_rows.extend(info["price_rows"])
             if info["status"] == "summary_duplicate":
                 stats["summary_sheets"] += 1
                 stats["summary_rows"] += counts["summary"]
@@ -162,7 +167,7 @@ def parse_kind(folder: Path, kind: str, folder_name: str | None = None, with_pic
                           "loaded": counts["loaded"], "excluded_blank": counts["blank"],
                           "excluded_total": counts["total"], "excluded_header": counts["header"],
                           "skipped_driving": counts["skipped_driving"], "summary_rows": counts["summary"],
-                          "quarantined": counts["quarantined"], "photos": len(pics.get(sno, [])),
+                          "excluded_footer": counts["footer"], "quarantined": counts["quarantined"], "photos": len(pics.get(sno, [])),
                           "records": info.get("records", 0), "merged_fill_cells": info.get("merged_fill", 0),
                           "reason": reason, "balanced": reconciled(counts)})
     cols = out_columns(kind)
@@ -171,7 +176,8 @@ def parse_kind(folder: Path, kind: str, folder_name: str | None = None, with_pic
         if c not in frame.columns:
             frame[c] = None
     frame = frame[cols]
-    return {"frame": frame, "recon": pd.DataFrame(recon, columns=RECON_COLS), "filemap": pd.DataFrame(filemap),
+    price = pd.DataFrame(price_rows, columns=PRICE_COLS)
+    return {"frame": frame, "price": price, "recon": pd.DataFrame(recon, columns=RECON_COLS), "filemap": pd.DataFrame(filemap),
             "photos": pd.DataFrame(photos, columns=["source_folder", "source_file_no", "source_sheet_no", "row", "col"]),
             "stats": stats}
 
@@ -179,7 +185,7 @@ def parse_kind(folder: Path, kind: str, folder_name: str | None = None, with_pic
 def report_lines(kind: str, res: dict) -> list[str]:
     st, rc, fr = res["stats"], res["recon"], res["frame"]
     tot = {k: int(rc[k].sum()) for k in ("source_rows", "loaded", "excluded_blank", "excluded_total", "excluded_header",
-                                          "skipped_driving", "summary_rows", "quarantined")}
+                                          "skipped_driving", "summary_rows", "excluded_footer", "quarantined")}
     chk = st["summary_checks"]
     deciles = Counter(min(int(10 * m / t), 9) if t else -1 for m, t in chk)
     lines = [f"[{kind}] files: {st['files']}  read once: {st['unique_files']}  sheets read: {st['sheets_read']}"
@@ -195,6 +201,8 @@ def report_lines(kind: str, res: dict) -> list[str]:
              f"[{kind}] merged-cell fill: cells {st['merged_fill']} in {st['merged_fill_sheets']} sheets",
              f"[{kind}] matrix sheets: {st['matrix_sheets']}  labels: {st['matrix_labels']}  records: {st['matrix_records']}"
              f"  zero cells dropped: {st['zero_dropped']}",
+             f"[{kind}] row-sum check (client cells vs total column, tolerance 1): checked {st['rowsum_checked']}"
+             f"  mismatch {st['rowsum_mismatch']}",
              f"[{kind}] summary candidates (sheets without header): {len(chk)}  confirmed: {st['summary_sheets']}"
              f"  matched numbers: {sum(m for m, t in chk)} of {sum(t for m, t in chk)}"
              f"  ratio-decile histogram (-1 = no numbers): {dict(sorted(deciles.items()))}",
@@ -218,6 +226,12 @@ def main() -> int:
         write_csv(res["filemap"], out / f"{kind}_file_map.csv")
         if kind == "maintenance":
             write_csv(res["photos"], out / "maintenance_photos.csv")
+        if kind == "revenue":
+            write_csv(res["price"], out / "revenue_client_price.csv")
+            pr = res["price"]
+            print(f"[{kind}] client price rows: {len(pr)}  by price_basis: "
+                  f"{ {b: int((pr['price_basis'] == b).sum()) for b in ('company', 'invoice', 'diff')} }"
+                  f"  footer_unknown: {res['stats']['footer_unknown']}")
         for line in report_lines(kind, res):
             print(line)
         print(f"[{kind}] output rows: {len(res['frame'])}  output columns: {list(res['frame'].columns)}")

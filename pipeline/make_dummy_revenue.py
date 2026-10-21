@@ -13,11 +13,75 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 CLIENTS = ["ZZCLIENT_ALPHA", "ZZCLIENT_BETA", "ZZCLIENT_GAMMA"]
 SHEET_NAMES = ["ZZSHEET_ALPHA", "ZZSHEET_BETA", "ZZSHEET_GAMMA", "ZZSHEET_DELTA"]
 OTHER_HEADER = "ZZNOTE_COLUMN"
-SECRET_STRINGS = CLIENTS + SHEET_NAMES + [OTHER_HEADER, "ZZSHOP", "ZZMEMO"]
+MX_SHEET = "ZZSHEET_EPSILON"
+MX_CLIENTS = [f"ZZMX_CLIENT_{i}" for i in range(1, 7)]
+MX_PRICE_COMPANY = [1000 + 100 * i for i in range(6)]
+MX_PRICE_INVOICE = [1200 + 100 * i for i in range(6)]
+SECRET_STRINGS = CLIENTS + SHEET_NAMES + MX_CLIENTS + [MX_SHEET, OTHER_HEADER, "ZZSHOP", "ZZMEMO"]
 
 # truth: rows expected per sheet of the revenue book A
 TRUTH = {"A_sheet1": {"loaded": 6, "blank": 1, "total": 1, "header": 3, "quarantined": 0},
          "A_sheet2": {"loaded": 4, "blank": 0, "total": 1, "header": 3, "quarantined": 0}}
+
+
+def _matrix_sheet(wb) -> None:
+    """Horizontal sheet shaped like the real layout: title and percent block above the header (rows 1-2, cols J..O),
+    merged 2-row header at row 3, dates in A, six client columns B..G (kilograms), row-sum column H, a number block in
+    J52:K71, a total row (tons), then nine tail lines and blank lines, memos in column I. Values are invented."""
+    ws = wb.create_sheet(MX_SHEET)
+    ws.cell(1, 1, "ZZTITLE 1월분 거래내역")
+    ws.merge_cells("A1:G1")
+    for i, name in enumerate(MX_CLIENTS):
+        ws.cell(1, 10 + i, name)
+        ws.cell(2, 10 + i, 0.1 + 0.01 * i)
+    ws.cell(3, 1, "거래처" + chr(10) + "날 짜")
+    for i, name in enumerate(MX_CLIENTS):
+        ws.cell(3, 2 + i, name)
+    ws.cell(3, 8, "합   계")
+    for c in range(1, 9):
+        ws.merge_cells(start_row=3, start_column=c, end_row=4, end_column=c)
+    first, last = 5, 81
+    tot = [0.0] * 6
+    day = 0
+    for r in range(first, last + 1):
+        if (r - first) % 3 == 0:
+            day += 1
+            ws.cell(r, 1, dt.datetime(2020, 1, day))
+        vals = [((r * 7 + i * 13) % 40) * 25 + 100 if (r + i) % 4 else None for i in range(6)]
+        for i, v in enumerate(vals):
+            if v is not None:
+                ws.cell(r, 2 + i, v)
+                tot[i] += v
+        ws.cell(r, 8, sum(v for v in vals if v is not None))
+        if 52 <= r <= 71:
+            ws.cell(r, 10, 123 + r)
+            ws.cell(r, 11, 456 + r)
+    tr = last + 1  # 82
+    ws.cell(tr, 1, "합    계")
+    tons = [t / 1000 for t in tot]
+    for i, t in enumerate(tons):
+        ws.cell(tr, 2 + i, t)
+    ws.cell(tr, 8, sum(tons))
+
+    def block(top, label_price, prices, tail_names):
+        ws.cell(top, 1, label_price)
+        sup = [p * t for p, t in zip(prices, tons)]
+        for i in range(6):
+            ws.cell(top, 2 + i, prices[i])
+            ws.cell(top + 1, 2 + i, sup[i])
+            ws.cell(top + 2, 2 + i, sup[i] * 0.1)
+            ws.cell(top + 3, 2 + i, sup[i] * 1.1)
+        for k, nm in enumerate(tail_names, start=1):
+            ws.cell(top + k, 1, nm)
+        ws.cell(top + 1, 8, sum(sup))
+
+    block(84, "단가(회사인정)", MX_PRICE_COMPANY, ["공 급 가 액", "부  가  세", "회사받은금액"])
+    ws.cell(84, 9, "마감자료제출시삭제")
+    block(89, "단가(발행단가)", MX_PRICE_INVOICE, ["공 급 가 액", "부  가  세", "청구한 금액"])
+    ws.cell(94, 1, "차이 금액")
+    for i in range(6):
+        ws.cell(94, 2 + i, (MX_PRICE_INVOICE[i] - MX_PRICE_COMPANY[i]) * tons[i] * 1.1)
+    ws.cell(94, 9, "제출시삭제")
 
 
 def make(outdir: Path) -> None:
@@ -117,6 +181,7 @@ def make(outdir: Path) -> None:
     for i, v in enumerate([123456, 654321, 111111]):
         wun.cell(1 + i, 1, f"ZZMEMO other {i}")
         wun.cell(1 + i, 2, v)
+    _matrix_sheet(wb)
     wb.save(rev / "dummy_rev_004.xlsx")
 
     # maintenance: text table plus one picture
