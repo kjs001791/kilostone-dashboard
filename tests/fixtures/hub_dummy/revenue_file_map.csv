@@ -1,0 +1,4 @@
+﻿folder,file_no,file_name,file_hash,read_as_file_no,duplicate_of
+revenue,1,dummy1.xlsx,dummyhash_tab,1,
+revenue,2,dummy2.xlsx,dummyhash_mat,2,
+revenue,3,dummy3.xlsx,dummyhash_old,3,

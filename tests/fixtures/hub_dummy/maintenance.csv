@@ -1,0 +1,6 @@
+﻿source_folder,source_file_no,source_sheet_no,source_row_no,file_hash,table_kind,date,vehicle,item,shop,quantity,unit_price,cost,odometer_km,note,date_basis,merged_fill,extra
+maintenance,1,1,1,dummyhash_mnt,date+item+cost,2024-02-10,,엔진오일,가짜정비소,1,100000,100000,100001,,cell,,
+maintenance,1,1,2,dummyhash_mnt,date+item+cost,2024-06-30,,타이어,가짜정비소,1,200000,200000,100002,,cell,,
+maintenance,1,1,3,dummyhash_mnt,date+item+cost,2024-07-01,,브레이크,가짜정비소,1,300000,300000,100003,,cell,,
+maintenance,1,1,4,dummyhash_mnt,date+item+cost,,,점검,가짜정비소,1,400000,400000,100004,,cell,,
+maintenance,1,1,5,dummyhash_mnt,date+item+cost,2018-01-01,,도장,가짜정비소,1,500000,500000,100005,,cell,,

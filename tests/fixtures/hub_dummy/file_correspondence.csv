@@ -1,0 +1,7 @@
+﻿folder,file_no,file_name,file_hash,in_driving,in_revenue
+revenue,1,dummy1.xlsx,dummyhash_tab,True,True
+revenue,2,dummy2.xlsx,dummyhash_mat,True,True
+revenue,3,dummy3.xlsx,dummyhash_old,False,True
+driving,1,dummy1.xlsx,dummyhash_tab,True,True
+driving,2,dummy2.xlsx,dummyhash_mat,True,True
+driving,3,dummy4.xlsx,dummyhash_drv,True,False

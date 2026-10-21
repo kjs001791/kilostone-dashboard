@@ -1,0 +1,4 @@
+﻿행 번호,칸,원래 값,고친 값,적용 규칙,규칙 설명
+2,distance,2000.0,200.0,typo_digit,자릿수 오타
+8,cumulative_distance,5.0,101400.0,chain,누적 거리 사슬
+10,distance,1.0,2.0,typo_digit,격리된 행
