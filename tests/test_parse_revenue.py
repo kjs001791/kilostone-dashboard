@@ -217,3 +217,74 @@ def test_line_item_header_stays_on_table_path():
     assert info["status"] == "ok"
     assert info["table_kind"] != "matrix"
     assert {"quantity", "unit_price", "supply_amount", "vat"} <= set(info["mapped"])
+
+
+def _old_wide_sheet(total_label, price_names):
+    """2015-2019 horizontal layout: trips under one date share it, a price block lists one client per line."""
+    import datetime as dt
+
+    import pandas as pd
+    n = None
+    rows = [["김 성 훈", n, n, n, n], [n] * 5, ["㈜대신산업   (3월분)", n, n, n, n],
+            ["날짜 거래처", "쌍용(P/C)", "쌍용(S/C)", "한남시멘트", n]]
+    days = [(2, 25000, n, 24000), (3, n, 30000, n), (4, 26000, n, n), (5, 25500, n, n)]
+    for d, a, b, c in days:
+        rows.append([dt.datetime(2016, 3, d), a, b, c, n])
+    rows.append([n, 26500, n, n, n])  # second trip on the 5th
+    rows.append([total_label, 103.0, 30.0, 24.0, n])
+    rows.append([n] * 5)
+    rows.append([n, "단  가", "수  량", "공급가액", "세  액"])
+    for name, price, qty in zip(price_names, (5000, 6000, 7000), (103.0, 30.0, 24.0)):
+        rows.append([name, price, qty, price * qty, price * qty * 0.1])
+    rows.append([n, n, 157.0, 1063000.0, 106300.0])
+    rows.append(["합계금액", 1169300.0, n, n, n])
+    rows.append(["차액", 1000, n, n, n])
+    rows.append(["3월 25일 입금", 1169300.0, n, n, n])
+    return pd.DataFrame(rows, dtype=object)
+
+
+@pytest.mark.parametrize("total_label, names", [
+    ("합  계", ["쌍용(P/C)", "쌍용(S/C)", "한남시멘트"]),
+    (None, ["쌍용벌크운반비", "쌍용슬래그운반비", "한남시멘트운반비"]),  # no total label, names differ from the header
+])
+def test_old_wide_sheet_price_block_per_client(total_label, names):
+    from pipeline.revenue_common import parse_table_sheet, reconciled
+    df = _old_wide_sheet(total_label, names)
+    rows, counts, info = parse_table_sheet("revenue", df, 1, 1, "h", "revenue")
+    assert info["status"] == "matrix"  # short sheet: the price header sits inside the header scan window
+    assert reconciled(counts)
+    w = [r["weight_kg"] for r in rows if r["weight_kg"] is not None]
+    assert sorted(w) == sorted([25000, 24000, 30000, 26000, 25500, 26500])  # no total, price or amount as weight
+    assert all(r["date"] for r in rows)
+    assert [r["date"] for r in rows if r["weight_kg"] == 26500] == ["2016-03-05"]
+    assert info["unlabeled_total"] == (0 if total_label else 1)
+    got = {p["client"]: (p["price_basis"], p["unit_price"], p["supply_amount"]) for p in info["price_rows"]}
+    assert got == {"쌍용(P/C)": ("company", 5000, 515000), "쌍용(S/C)": ("company", 6000, 180000),
+                   "한남시멘트": ("company", 7000, 168000)}
+    assert {p["year_month"] for p in info["price_rows"]} == {"2016-03"}
+    assert info["price_unmatched"] == 0
+
+
+def test_deposit_lines_under_the_price_block_are_not_trips():
+    """2020s layout: bank deposit lines sit under 차이 금액 with the amount in a client column."""
+    import datetime as dt
+
+    import pandas as pd
+    from pipeline.revenue_common import parse_table_sheet, reconciled
+    n = None
+    rows = [["9월분 (주)대신산업 거래내역", n, n, n], ["거래처  날 짜", "창원쌍용 (P/C)", "광양쌍용 (P/C)", "동아C&C대신"]]
+    for d in range(1, 6):
+        rows.append([dt.datetime(2023, 2, d), 25000, n, 24000])
+    rows.append(["합    계", 125.0, 0.0, 120.0])
+    rows.append(["단가(회사인정)", 5000, 5000, 6000])
+    rows.append(["공 급 가 액", 625000, 0, 720000])
+    rows.append(["차이 금액", 0, 0, 0])
+    rows.append([n, dt.datetime(2023, 3, 10), "대체", 1500000])  # deposit: date, kind, amount in the 동아 column
+    rows.append([n, n, n, 3000000])  # SUM of deposits
+    rows.append([n, n, "미수금", 0])
+    df = pd.DataFrame(rows, dtype=object)
+    out, counts, info = parse_table_sheet("revenue", df, 1, 1, "h", "revenue")
+    assert info["status"] == "matrix"
+    assert reconciled(counts)
+    assert sorted(r["weight_kg"] for r in out if r["weight_kg"] is not None) == [24000] * 5 + [25000] * 5
+    assert all(r["source_row_no"] <= 7 for r in out)

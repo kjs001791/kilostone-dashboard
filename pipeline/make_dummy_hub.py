@@ -69,12 +69,17 @@ def revenue_rows() -> tuple[list[dict], list[dict]]:
                 continue  # no invoice price this month: matrix revenue stays empty
             add_price(H_MATRIX, 2, ym, names[i % len(names)], "invoice", INVOICE_PRICE[who], 500000, 50000, 550000, [40, 41, 42])
         add_price(H_MATRIX, 2, ym, CLIENT_A[0], "company", 48000, 480000, 48000, 528000, [43, 44])
+    # a month with a company price only (the 2015-2019 sheets): matrix revenue falls back to it
+    add_price(H_MATRIX, 2, MONTHS[0], CLIENT_D[0], "company", 30000, None, None, None, [45])
     # vehicle period edge: 2024-06-30 is the last day of V03, 2024-07-01 the first day of V04
     for day in ("2024-06-30", "2024-07-01"):
         add(H_TABLE, "date+client+weight_ton+supply_amount", {"date": day, "client": CLIENT_C[0], "weight_ton": 20.0,
                                                                "supply_amount": 600000}, "tab")
     # a table row without date, a matrix cell outside the label columns, a summary row
     add(H_TABLE, "date+client+weight_ton", {"date": None, "client": CLIENT_C[0], "weight_ton": 10.0}, "tab")
+    # a price list read as a table: a date and places but nothing measured
+    add(H_TABLE, "date+origin+destination+unit_price", {"date": "2024-03-01", "origin": PLACES["항"][0],
+                                                         "destination": PLACES["창고"][0], "unit_price": 1000}, "tab")
     add(H_MATRIX, "matrix", {"date": "2024-03-10", "client": None, "weight_kg": None,
                              "extra": json.dumps({"header": "합 계", "value": 99, "col": 9, "outside_label": True}, ensure_ascii=False)}, "mat")
     add(H_MATRIX, "summary", {"date": None, "extra": json.dumps({"col_1": 1}, ensure_ascii=False)}, "mat")

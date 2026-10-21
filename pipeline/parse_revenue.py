@@ -84,7 +84,8 @@ def parse_kind(folder: Path, kind: str, folder_name: str | None = None, with_pic
              "table_kind": Counter(), "day_only": Counter(), "files": len(files), "unique_files": len(set(canon)), "sheets_read": 0,
              "sheets_with_date": 0, "unreadable": Counter(), "merged_fill": 0, "merged_fill_sheets": 0,
              "matrix_sheets": 0, "matrix_records": 0, "matrix_labels": 0, "zero_dropped": 0, "summary_sheets": 0,
-             "summary_rows": 0, "summary_checks": [], "rowsum_checked": 0, "rowsum_mismatch": 0, "footer_unknown": 0}
+             "summary_rows": 0, "summary_checks": [], "rowsum_checked": 0, "rowsum_mismatch": 0, "footer_unknown": 0,
+             "unlabeled_total": 0, "price_unmatched": 0}
     price_rows = []
     filemap = []
     for fno, f in enumerate(files, start=1):
@@ -151,6 +152,8 @@ def parse_kind(folder: Path, kind: str, folder_name: str | None = None, with_pic
                 stats["rowsum_checked"] += info["rowsum_checked"]
                 stats["rowsum_mismatch"] += info["rowsum_mismatch"]
                 stats["footer_unknown"] += info["footer_unknown"]
+                stats["unlabeled_total"] += info["unlabeled_total"]
+                stats["price_unmatched"] += info["price_unmatched"]
                 price_rows.extend(info["price_rows"])
             if info["status"] == "summary_duplicate":
                 stats["summary_sheets"] += 1
@@ -231,7 +234,9 @@ def main() -> int:
             pr = res["price"]
             print(f"[{kind}] client price rows: {len(pr)}  by price_basis: "
                   f"{ {b: int((pr['price_basis'] == b).sum()) for b in ('company', 'invoice', 'diff')} }"
-                  f"  footer_unknown: {res['stats']['footer_unknown']}")
+                  f"  footer_unknown: {res['stats']['footer_unknown']}"
+                  f"  price block lines without a client: {res['stats']['price_unmatched']}"
+                  f"  total rows without label: {res['stats']['unlabeled_total']}")
         for line in report_lines(kind, res):
             print(line)
         print(f"[{kind}] output rows: {len(res['frame'])}  output columns: {list(res['frame'].columns)}")

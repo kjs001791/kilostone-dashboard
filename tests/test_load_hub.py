@@ -71,9 +71,15 @@ def test_matrix_revenue_is_weight_over_1000_times_invoice_price(dummy):
     b = int(al[al["alias"] == "다라건설"]["client_id"].iloc[0])
     nb = de[(de["source_kind"] == "matrix") & (de["client_id"] == b) & (de["date"].astype(str) == "2025-02-10")].iloc[0]
     assert pd.isna(nb["supply_amount"]) and nb["amount_source"] is None
-    # the client without any price row at all stays empty everywhere
+    # a company price alone is used when the month has no invoice price; other months stay empty
     d_id = int(al[al["alias"] == "사아산업(유)"]["client_id"].iloc[0])
-    assert de[(de["client_id"] == d_id)]["supply_amount"].isna().all()
+    dm = de[(de["source_kind"] == "matrix") & (de["client_id"] == d_id)]
+    first = dm[dm["date"].astype(str).str.startswith("2024-01")]
+    assert len(first) == 1 and first.iloc[0]["amount_source"] == "computed_company"
+    assert float(first.iloc[0]["supply_amount"]) == pytest.approx(5000 / 1000 * 30000)
+    assert dm[~dm["date"].astype(str).str.startswith("2024-01")]["supply_amount"].isna().all()
+    # where both exist, the invoice price wins
+    assert r["amount_source"] == "computed_invoice"
 
 
 def test_table_row_weight_units_three_ways(dummy):
@@ -101,6 +107,7 @@ def test_quarantine_reason_codes(dummy):
                                                               q.groupby(["target_table", "reason"]).size())}
     assert got[("delivery", "no_date")] == 1
     assert got[("delivery", "matrix_outside_label")] == 1
+    assert got[("delivery", "no_measure")] == 1
     assert got[("delivery", "duplicate_older_file")] == 2
     assert got[("product", "duplicate_price")] == 1
     assert got[("product", "price_not_loaded")] == 2
@@ -192,3 +199,16 @@ def test_write_db_row_counts_match_frames(dummy):
     with eng.connect() as c:
         assert c.execute(text("select count(*) from hub.delivery")).scalar() == len(f["delivery"])
     eng.dispose()
+
+
+def test_dates_outside_service_years_are_out_of_range():
+    """A sheet date before the first vehicle went into service, or after today, is a typo, not a delivery."""
+    import datetime as dt
+
+    import pandas as pd
+
+    from pipeline.load_hub import out_of_range
+
+    dates = pd.Series(pd.to_datetime(["1901-12-03", "1954-10-01", "2007-01-01", "2020-05-05", None, "2099-01-01"]))
+    got = out_of_range(dates, dt.date(2007, 1, 1), dt.date(2026, 10, 21)).tolist()
+    assert got == [True, True, False, False, False, True]

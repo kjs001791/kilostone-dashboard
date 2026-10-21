@@ -70,9 +70,13 @@ def summary(month: Optional[str] = Query(None, pattern=MONTH_PATTERN), engine=De
         prev_rev, prev_ton = month_totals(prev)
         ly_rev, ly_ton = month_totals(ly)
 
+        missing_kg = _num(conn.execute(text(
+            "SELECT sum(weight_kg) FROM hub.delivery WHERE date >= :a AND date < :b AND supply_amount IS NULL"
+        ), {"a": first, "b": nxt}).scalar())
+
         has_computed = bool(conn.execute(text(
             "SELECT EXISTS (SELECT 1 FROM hub.delivery WHERE date >= :a AND date < :b "
-            "AND amount_source = 'computed_invoice')"
+            "AND amount_source LIKE 'computed_%')"
         ), {"a": first, "b": nxt}).scalar())
 
         clients = conn.execute(text(
@@ -94,6 +98,7 @@ def summary(month: Optional[str] = Query(None, pattern=MONTH_PATTERN), engine=De
         "month": month,
         "revenue": {"this_month": cur_rev, "prev_month": prev_rev, "same_month_last_year": ly_rev},
         "revenue_has_computed": has_computed,
+        "revenue_missing_ton": missing_kg / 1000 if missing_kg is not None else None,
         "weight_ton": {"this_month": cur_ton, "prev_month": prev_ton, "same_month_last_year": ly_ton},
         "by_client": [
             {

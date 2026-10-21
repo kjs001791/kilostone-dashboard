@@ -9,6 +9,7 @@ The DB password comes from the libpq password file, never from this code.
 from __future__ import annotations
 
 import argparse
+import datetime as dt
 import json
 import os
 import re
@@ -32,7 +33,7 @@ DUMMY_DIR = ROOT / "tests" / "fixtures" / "hub_dummy"
 DEFAULT_DSN = "postgresql+psycopg://postgres@localhost:5432/kilostone"
 DSN_ENV = "KILOSTONE_PG_DSN"
 
-REASONS = ["no_date", "summary_table", "matrix_outside_label", "duplicate_older_file", "duplicate_price", "price_not_loaded",
+REASONS = ["no_date", "date_out_of_range", "summary_table", "matrix_outside_label", "no_measure", "duplicate_older_file", "duplicate_price", "price_not_loaded",
            "vehicle_unknown", "duplicate_identical", "duplicate_conflict", "no_values"]
 
 # frame name -> insert order (frames whose name starts with "_" are reports, not tables)
@@ -197,6 +198,12 @@ def _vehicle_by_date(vehicles: pd.DataFrame, dates: pd.Series) -> pd.Series:
     return out
 
 
+def out_of_range(dates: pd.Series, first_day, last_day) -> pd.Series:
+    """True where a date is before the first vehicle's service start or after today. Empty dates are not out of range."""
+    ts = pd.to_datetime(dates)
+    return ts.notna() & ((ts < pd.Timestamp(first_day)) | (ts > pd.Timestamp(last_day)))
+
+
 def _quarantine_row(target: str, reason: str, row: pd.Series, file_col="source_file_no") -> dict:
     f, s, r = _src(row, file_col)
     return {"target_table": target, "reason": reason, "source_file_no": f, "source_sheet_no": s, "source_row_no": r,
@@ -214,6 +221,7 @@ def build_frames(parsed_dir, review_dir, vehicle_csv=None, merge_csv=None) -> di
     merge_csv = Path(merge_csv) if merge_csv else NAME_MERGE_CSV
     merge = _load_merge(merge_csv)
     vehicles = _load_vehicles(vehicle_csv)
+    first_service = pd.to_datetime(vehicles["service_start"]).min().date()
 
     rev = _read(parsed_dir / "revenue.csv", dtype={"file_hash": str}, low_memory=False)
     price_in = _read(parsed_dir / "revenue_client_price.csv", dtype={"file_hash": str}, low_memory=False)
@@ -272,9 +280,11 @@ def build_frames(parsed_dir, review_dir, vehicle_csv=None, merge_csv=None) -> di
         "source_file_no": _num(p["source_file_no"]), "source_sheet_no": _num(p["source_sheet_no"]),
         "source_row_no": p["source_row_nos"].map(_first_row_no),
     })
-    inv = product[(product["price_basis"] == "invoice") & product["unit_price"].notna()].copy()
-    inv["_ym"] = inv["valid_from"].astype(str).str.slice(0, 7)
-    inv_price = {(c, m): u for c, m, u in zip(inv["client_id"], inv["_ym"], inv["unit_price"])}
+    # matrix revenue = tons x the month's price: the invoice price, else the company price (2015-2019 sheets have only that)
+    month_price = {}
+    for b in ("invoice", "company"):
+        pb = product[(product["price_basis"] == b) & product["unit_price"].notna()]
+        month_price[b] = {(c, str(v)[:7]): u for c, v, u in zip(pb["client_id"], pb["valid_from"], pb["unit_price"])}
 
     # ---- delivery
     d = rev.copy().reset_index(drop=True)
@@ -287,7 +297,14 @@ def build_frames(parsed_dir, review_dir, vehicle_csv=None, merge_csv=None) -> di
     reason = pd.Series([None] * len(d), dtype=object)
     reason[kind == "summary"] = "summary_table"
     reason[reason.isna() & d["_date"].isna()] = "no_date"
+    reason[reason.isna() & out_of_range(d["_date"], first_service, dt.date.today())] = "date_out_of_range"
     reason[reason.isna() & is_matrix & (outside | d["_client_id"].isna())] = "matrix_outside_label"
+    # a row with nothing measured (no weight, amount, quantity or trips) is a list or a note, not a delivery
+    measured = pd.Series(False, index=d.index)
+    for c in ("weight_ton", "weight_kg", "supply_amount", "amount", "total_amount", "quantity", "trips"):
+        if c in d:
+            measured |= _num(d[c]).notna()
+    reason[reason.isna() & ~measured] = "no_measure"
     # older revenue-only workbooks: a row whose (date, client, kind) is also in the shared workbooks is a copy
     rev_h = set(fc.loc[fc["folder"] == "revenue", "file_hash"])
     drv_h = set(fc.loc[fc["folder"] == "driving", "file_hash"])
@@ -334,10 +351,14 @@ def build_frames(parsed_dir, review_dir, vehicle_csv=None, merge_csv=None) -> di
     unit_price = _num(keep["unit_price"]) if "unit_price" in keep else pd.Series(np.nan, index=keep.index)
     ymv = keep["_date"].dt.strftime("%Y-%m")
     for i in keep.index[keep_matrix]:
-        up = inv_price.get((keep.at[i, "_client_id"], ymv[i]))
-        if up is not None and pd.notna(up) and pd.notna(weight[i]):
-            supply[i] = float(weight[i]) / 1000.0 * float(up)
-            amount_src[i] = "computed_invoice"
+        if pd.isna(weight[i]):
+            continue
+        for b in ("invoice", "company"):
+            up = month_price[b].get((keep.at[i, "_client_id"], ymv[i]))
+            if up is not None and pd.notna(up):
+                supply[i] = float(weight[i]) / 1000.0 * float(up)
+                amount_src[i] = "computed_" + b
+                break
             unit_price[i] = up
         else:
             supply[i] = np.nan

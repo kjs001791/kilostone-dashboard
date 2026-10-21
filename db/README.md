@@ -36,5 +36,5 @@
 - 모든 외래키 칸에 인덱스, delivery(date)와 driving(date) 인덱스 포함
 - 만들지 않은 테이블: weather, station (route.station_no 는 외래키 없는 숫자 칸)
 - client.business_no: company_profile 이 채워질 때까지 외래키 아님
-- delivery: 공급가액 출처 `amount_source`(sheet, computed_invoice), 물량 환산 근거 `weight_basis`(kg, ton_x1000, matrix_kg), 이상 표시 `flags`(jsonb), 원본 수량·금액·비고(`quantity`, `amount`, `note`) 보존
+- delivery: 공급가액 출처 `amount_source`(sheet, computed_invoice, computed_company), 물량 환산 근거 `weight_basis`(kg, ton_x1000, matrix_kg), 이상 표시 `flags`(jsonb), 원본 수량·금액·비고(`quantity`, `amount`, `note`) 보존
 - maintenance: 원본에 날짜가 없는 줄을 받기 위해 `date` 비움 허용

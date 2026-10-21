@@ -11,8 +11,8 @@ export interface Compare {
 export interface ClientRow {
   client_id: number;
   client_name: string;
-  weight_ton: number;
-  revenue: number;
+  weight_ton: number | null;
+  revenue: number | null;
   days: number;
 }
 
@@ -20,12 +20,13 @@ export interface HubSummary {
   month: string;
   revenue: Compare;
   revenue_has_computed: boolean;
+  revenue_missing_ton: number | null;
   weight_ton: Compare;
   by_client: ClientRow[];
   driving: {
     days: number;
-    distance_km: number;
-    fuel_l: number;
+    distance_km: number | null;
+    fuel_l: number | null;
     avg_efficiency: number | null;
   };
 }

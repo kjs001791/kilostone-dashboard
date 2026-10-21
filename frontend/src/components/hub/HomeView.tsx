@@ -6,7 +6,9 @@ import { BottomTabs } from "./BottomTabs";
 import { TopNav } from "./TopNav";
 import { hubApi, type HubSummary } from "@/lib/hubApi";
 
-const won = (n: number) => `${Math.round(n).toLocaleString("ko-KR")}원`;
+// null means "no value in the data", which is shown as such, never as 0
+const won = (n: number | null) => (n == null ? "단가 없음" : `${Math.round(n).toLocaleString("ko-KR")}원`);
+const ton = (n: number | null) => (n == null ? "-" : n.toFixed(1));
 
 function Delta({ label, now, base }: { label: string; now: number | null; base: number | null }) {
   let text = "비교 없음";
@@ -42,11 +44,16 @@ export function HomeView() {
 
   useEffect(() => {
     if (!month) return;
+    // a slower answer for a month the user already left must not overwrite the current one
+    let current = true;
     setData(null);
     hubApi
       .summary(month)
-      .then(setData)
-      .catch((e) => setError(e.message));
+      .then((d) => current && setData(d))
+      .catch((e) => current && setError(e.message));
+    return () => {
+      current = false;
+    };
   }, [month]);
 
   const eff = data?.driving.avg_efficiency;
@@ -77,7 +84,10 @@ export function HomeView() {
             <Card data-testid="card-revenue">
               <CardContent className="p-4">
                 <p className="text-base text-muted-foreground">이번 달 매출</p>
-                <p className="text-3xl font-bold">{won(data.revenue.this_month ?? 0)}</p>
+                <p className="text-3xl font-bold">{won(data.revenue.this_month)}</p>
+                {data.revenue_missing_ton != null && data.revenue_missing_ton > 0 && (
+                  <p className="text-sm text-muted-foreground">단가가 없어 빠진 운송 {ton(data.revenue_missing_ton)}톤</p>
+                )}
                 {data.revenue_has_computed && (
                   <p className="text-sm text-muted-foreground">일부는 톤×단가로 계산한 값</p>
                 )}
@@ -91,7 +101,7 @@ export function HomeView() {
             <Card data-testid="card-weight">
               <CardContent className="p-4">
                 <p className="text-base text-muted-foreground">이번 달 운송량</p>
-                <p className="text-3xl font-bold">{(data.weight_ton.this_month ?? 0).toFixed(1)}톤</p>
+                <p className="text-3xl font-bold">{ton(data.weight_ton.this_month)}톤</p>
               </CardContent>
             </Card>
 
@@ -100,7 +110,7 @@ export function HomeView() {
                 <p className="text-base text-muted-foreground">운행 요약</p>
                 <div className="mt-1 space-y-1 text-lg">
                   <p>운행일 <b>{data.driving.days}일</b></p>
-                  <p>주행거리 <b>{Math.round(data.driving.distance_km).toLocaleString("ko-KR")} km</b></p>
+                  <p>주행거리 <b>{data.driving.distance_km == null ? "-" : Math.round(data.driving.distance_km).toLocaleString("ko-KR")} km</b></p>
                   <p>평균 연비 <b>{eff != null ? eff.toFixed(2) : "-"} km/L</b></p>
                 </div>
               </CardContent>
@@ -114,7 +124,7 @@ export function HomeView() {
                   <li key={`${c.client_id}-${c.client_name}`} className="rounded-lg border p-3">
                     <p className="text-lg font-semibold">{c.client_name}</p>
                     <div className="mt-1 flex justify-between text-base">
-                      <span>{c.weight_ton.toFixed(1)}톤 · {c.days}일</span>
+                      <span>{ton(c.weight_ton)}톤 · {c.days}일</span>
                       <span className="font-semibold">{won(c.revenue)}</span>
                     </div>
                   </li>
@@ -132,14 +142,14 @@ export function HomeView() {
                 </thead>
                 <tbody>
                   {data.by_client.map((c) => {
-                    const total = data.by_client.reduce((s, x) => s + x.revenue, 0);
+                    const total = data.by_client.reduce((s, x) => s + (x.revenue ?? 0), 0);
                     return (
                       <tr key={`${c.client_id}-${c.client_name}`} className="border-b">
                         <td className="py-2 font-semibold">{c.client_name}</td>
-                        <td className="py-2 text-right">{c.weight_ton.toFixed(1)}</td>
+                        <td className="py-2 text-right">{ton(c.weight_ton)}</td>
                         <td className="py-2 text-right">{won(c.revenue)}</td>
                         <td className="py-2 text-right">{c.days}일</td>
-                        <td className="py-2 text-right">{total === 0 ? "" : ((c.revenue / total) * 100).toFixed(1)}</td>
+                        <td className="py-2 text-right">{total === 0 || c.revenue == null ? "" : ((c.revenue / total) * 100).toFixed(1)}</td>
                       </tr>
                     );
                   })}

@@ -262,7 +262,7 @@ CREATE TABLE hub.delivery (
     quantity numeric,
     amount numeric,
     note text,
-    amount_source text check (amount_source in ('sheet','computed_invoice')),
+    amount_source text check (amount_source in ('sheet','computed_invoice','computed_company')),
     weight_basis text check (weight_basis in ('kg','ton_x1000','matrix_kg')),
     flags jsonb
 );
@@ -296,7 +296,7 @@ COMMENT ON COLUMN hub.delivery.source_col IS '원본 시트 안 열 번호(가�
 COMMENT ON COLUMN hub.delivery.quantity IS '원본에 적힌 수량';
 COMMENT ON COLUMN hub.delivery.amount IS '원본에 적힌 금액 칸(공급가액과 별개)';
 COMMENT ON COLUMN hub.delivery.note IS '원본 비고';
-COMMENT ON COLUMN hub.delivery.amount_source IS '공급가액의 출처(sheet=시트에 적힌 값, computed_invoice=물량×발행단가로 계산, 비움=공급가액 없음)';
+COMMENT ON COLUMN hub.delivery.amount_source IS '공급가액의 출처(sheet=시트에 적힌 값, computed_invoice=물량×발행단가로 계산, computed_company=발행단가가 없는 달에 물량×회사인정단가로 계산, 비움=공급가액 없음)';
 COMMENT ON COLUMN hub.delivery.weight_basis IS '물량 환산 근거(kg=원본이 킬로그램, ton_x1000=톤×1000, matrix_kg=가로형 킬로그램, 비움=물량 없음)';
 COMMENT ON COLUMN hub.delivery.flags IS '이상 표시(예: weight_unit_ambiguous=톤인지 킬로그램인지 구분 불가)';
 

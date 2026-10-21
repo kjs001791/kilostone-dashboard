@@ -1,6 +1,6 @@
 ﻿input_file,target_table,input_rows,loaded_rows,quarantined_rows,unlinked_rows,diff
-revenue.csv,delivery,22999,15955,7044,0,0
-revenue_client_price.csv,product,906,630,276,0,0
+revenue.csv,delivery,19576,12138,7438,0,0
+revenue_client_price.csv,product,1335,962,373,0,0
 maintenance.csv,maintenance,498,498,0,0,0
 driving_edited.csv,driving,3242,2693,549,0,0
 driving_corrections.csv,driving_correction,36,32,0,4,0

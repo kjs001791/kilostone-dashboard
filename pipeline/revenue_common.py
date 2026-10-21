@@ -277,7 +277,10 @@ def parse_table_sheet(kind: str, df: pd.DataFrame, file_no: int, sheet_no: int, 
     colmap, keys = header_columns(kind, hdr, ncol) if hdr else ({}, [])
     # a horizontal sheet also maps a few standard words in its header row (corner cell, row-sum column), so the
     # matrix test runs first when those are the only mapped words; a header with line-item words stays a table
-    if set(colmap) <= MATRIX_HEADER_STD:
+    # a short horizontal sheet can have its price block header (단가, 수량, 공급가액, 세액) inside the scan window,
+    # which then outscores the real header; a matrix corner above the chosen header row gets the matrix test too
+    corner = find_matrix_corner(kind, rows)
+    if set(colmap) <= MATRIX_HEADER_STD or (corner is not None and hr is not None and corner[0] < hr):
         mx = parse_matrix_sheet(kind, rows, ncol, active, merged or [], file_no, sheet_no, fhash, folder, sheet_name,
                                 file_name)
         if mx is not None:
@@ -386,6 +389,21 @@ def _num(v) -> bool:
     return isinstance(v, (int, float, np.integer, np.floating)) and not isinstance(v, bool) and not is_empty(v)
 
 
+# price block of the older horizontal sheets: one header row of these words, then one line per client
+PRICE_BLOCK_WORDS = {"단가": "unit_price", "수량": "quantity", "공급가액": "supply_amount", "세액": "vat"}
+
+
+def price_block_header(row) -> dict[str, int] | None:
+    """Column of each price word when the row is a price block header (단가 and at least two others)."""
+    cols = {}
+    for c, v in enumerate(row):
+        if isinstance(v, str):
+            f = PRICE_BLOCK_WORDS.get(re.sub(r"\s+", "", v))
+            if f and f not in cols:
+                cols[f] = c
+    return cols if "unit_price" in cols and len(cols) >= 3 else None
+
+
 def find_matrix_corner(kind: str, rows: list[list]):
     """Row whose first filled cell is a client/date style label followed by >=2 unmapped text labels."""
     for r in range(min(SCAN_ROWS, len(rows))):
@@ -440,7 +458,7 @@ def parse_matrix_sheet(kind, rows, ncol, active, merged, file_no, sheet_no, fhas
     info = {"status": "matrix", "mapped": [], "extra_keys": Counter(), "bad_cells": Counter(), "has_date": True,
             "table_kind": "matrix", "day_only": Counter(), "merged_fill": 0, "sumcols": Counter(), "records": 0,
             "labels": len(labels), "zero_dropped": 0, "rowsum_checked": 0, "rowsum_mismatch": 0, "footer_unknown": 0,
-            "price_rows": []}
+            "unlabeled_total": 0, "price_unmatched": 0, "price_rows": []}
     # label columns whose header is a standard word other than client (the row-sum column) are checked, not unpivoted
     std_cols = {cc for cc, t in colkey.items() if map_std(kind, t) not in (None, "client")}
     client_cols = label_cols - std_cols
@@ -455,6 +473,8 @@ def parse_matrix_sheet(kind, rows, ncol, active, merged, file_no, sheet_no, fhas
     ym, ym_src = infer_ym(pre, sheet_name, file_name)
     out = []
     footer = []  # (row index, name without whitespace, row)
+    price_cols, price_lines = None, []  # price block header columns; (row index, name, row) of its client lines
+    colsum: Counter = Counter()  # running kg per client column, to spot a total row that has no label
     cur, basis = None, ""
     total_seen = False
     for r in range(hend, len(rows)):
@@ -466,7 +486,28 @@ def parse_matrix_sheet(kind, rows, ncol, active, merged, file_no, sheet_no, fhas
             counts["total"] += 1
             total_seen = True
             continue
+        if price_cols is not None:  # everything under the price block header belongs to the block
+            counts["footer"] += 1
+            v0 = row[c0]
+            if isinstance(v0, str) and not is_empty(v0) and parse_date(v0)[1] != "ok":
+                price_lines.append((r, re.sub(r"\s+", "", v0), row))
+            continue
+        pc = price_block_header(row)
+        if pc is not None:
+            price_cols, total_seen = pc, True
+            counts["footer"] += 1
+            continue
         v0 = row[c0]
+        if total_seen and is_empty(v0):
+            counts["footer"] += 1  # lines under the totals without a label (deposit records, notes) are not trips
+            continue
+        # total row without a label: every client cell equals the kg above it / 1000 (sheet formula SUM(..)/1000)
+        sums = [(float(row[c]), colsum[c] / 1000) for c in client_cols if _num(row[c])]
+        if is_empty(v0) and sums and any(v for v, _ in sums) and all(abs(v - s) <= 0.001 for v, s in sums):
+            counts["total"] += 1
+            info["unlabeled_total"] += 1
+            total_seen = True
+            continue
         row_label = None
         if not is_empty(v0):
             d, k = parse_date(v0)
@@ -503,6 +544,8 @@ def parse_matrix_sheet(kind, rows, ncol, active, merged, file_no, sheet_no, fhas
             if row_label is not None:
                 extra["row_label"] = row_label
             is_client = c in client_cols
+            if is_client and _num(v):
+                colsum[c] += float(v)
             out.append({"source_folder": folder, "source_file_no": file_no, "source_sheet_no": sheet_no,
                         "source_row_no": r + 1, "file_hash": fhash, "table_kind": "matrix", "date": cur,
                         "date_basis": (basis if cur else ""), "client": key if is_client else None,
@@ -550,6 +593,31 @@ def parse_matrix_sheet(kind, rows, ncol, active, merged, file_no, sheet_no, fhas
                 continue
             rec["source_row_nos"] = json.dumps(sorted(r + 1 for r, _ in blk["lines"].values()))
             info["price_rows"].append(rec)
+    # price block: a line names its client; when the name differs from the header (쌍용벌크운반비 vs 쌍용(P/C)),
+    # its quantity is matched to the one client whose column total in tons is the same
+    client_labels = [(a, b, text) for (a, b), (_, text) in zip(spans, labels) if a in client_cols]
+    for r, name, row in price_lines:
+        def cell(f):
+            c = price_cols.get(f)
+            return float(row[c]) if c is not None and _num(row[c]) else None
+        qty = cell("quantity")
+        if (cell("unit_price") is None and qty is None) or name == "차액" or "입금" in name:
+            continue  # a note line under the block (difference, deposit date), not a client line
+        hit = [text for _, _, text in client_labels if re.sub(r"\s+", "", text) == name]
+        if not hit and qty:
+            hit = [text for a, b, text in client_labels
+                   if abs(sum(colsum[cc] for cc in range(a, b + 1)) / 1000 - qty) <= 0.001]
+        if len(hit) != 1:
+            info["price_unmatched"] += 1
+            info.setdefault("price_unmatched_lines", []).append((r + 1, name, len(hit)))
+            continue
+        rec = {"source_folder": folder, "source_file_no": file_no, "source_sheet_no": sheet_no, "file_hash": fhash,
+               "year_month": ymonth, "client": hit[0], "price_basis": "company", "unit_price": cell("unit_price"),
+               "supply_amount": cell("supply_amount"), "vat": cell("vat"), "total_amount": None,
+               "source_row_nos": json.dumps([r + 1])}
+        if rec["unit_price"] is None and rec["supply_amount"] is None:
+            continue
+        info["price_rows"].append(rec)
     return out, counts, info
 
 

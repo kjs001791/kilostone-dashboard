@@ -18,8 +18,9 @@ API 를 고치는 사람과 화면을 만드는 사람이 이 파일 하나로 �
 - 주소 앞머리: `/hub`
 - 날짜: `YYYY-MM-DD`, 월: `YYYY-MM`
 - 매출: `delivery.supply_amount` 합(공급가액, 부가세 제외)
-- 가로형 시트 행의 매출: 적재 때 계산한 값(`amount_source = 'computed_invoice'`)
-- 계산식: `weight_kg / 1000 × 그달 거래처 발행단가`
+- 가로형 시트 행의 매출: 적재 때 계산한 값(`amount_source = 'computed_invoice'` 또는 `'computed_company'`)
+- 계산식: `weight_kg / 1000 × 그달 거래처 발행단가`, 발행단가가 없는 달은 회사인정단가(2015~2019 시트는 단가가 회사인정단가 하나뿐)
+- `revenue_has_computed`: 그달 매출에 위 계산값이 하나라도 있으면 `true`
 - 운송량: `delivery.weight_kg` 합을 톤으로 표시
 
 ## GET /hub/months 는 데이터가 있는 달을 최근 달부터 준다
@@ -37,6 +38,7 @@ API 를 고치는 사람과 화면을 만드는 사람이 이 파일 하나로 �
   "month": "2025-02",
   "revenue": {"this_month": 0, "prev_month": 0, "same_month_last_year": 0},
   "revenue_has_computed": true,
+  "revenue_missing_ton": 0,
   "weight_ton": {"this_month": 0, "prev_month": 0, "same_month_last_year": 0},
   "by_client": [{"client_id": 1, "client_name": "", "weight_ton": 0, "revenue": 0, "days": 0}],
   "driving": {"days": 0, "distance_km": 0, "fuel_l": 0, "avg_efficiency": 0}
@@ -45,6 +47,8 @@ API 를 고치는 사람과 화면을 만드는 사람이 이 파일 하나로 �
 
 - `by_client`: 그달 매출 큰 순
 - 거래처 없는 행: `client_name = "미지정"`
+- `revenue_missing_ton`: 그달 운송 중 매출 칸이 비어 매출 합에서 빠진 운송량(톤), 없으면 `null`
+- `revenue`, `weight_ton`, `by_client` 의 `revenue` 와 `weight_ton`: 값이 하나도 없으면 `0` 이 아니라 `null`
 - 값이 없는 달의 비교 칸: `null`
 - `avg_efficiency`: 그달 `distance` 합 ÷ `consumed_fuel` 합
 
