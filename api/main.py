@@ -14,20 +14,24 @@ from api.routers.logs import router as logs_router
 from api.routers.stats import router as stats_router
 from api.routers.pipeline_runs import router as pipeline_runs_router
 from api.routers.users import router as users_router
+from api.routers.hub import router as hub_router
 from api.dependencies import get_db_engine
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # startup: DB 연결 미리 확인
-    engine = get_db_engine()
+    # MariaDB 확인이 실패해도 앱(/hub 포함)은 떠야 한다.
+    engine = None
     try:
+        engine = get_db_engine()
         with engine.connect():
             pass
     except Exception as e:
         print(f"❌ DB connection failed on startup: {e}")
     yield
     # shutdown: 커넥션 풀 정리
-    engine.dispose()
+    if engine is not None:
+        engine.dispose()
 
 app = FastAPI(title="KiloStone API", version="1.0.0", lifespan=lifespan)
 
@@ -49,6 +53,7 @@ app.include_router(users_router)
 app.include_router(logs_router)
 app.include_router(stats_router)
 app.include_router(pipeline_runs_router)
+app.include_router(hub_router)
 
 @app.get("/health")
 def health():
