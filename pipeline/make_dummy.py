@@ -148,12 +148,10 @@ def inject(clean: pd.DataFrame, seed: int, kind: str, mix: dict | None = None, e
     types = list(mix)
     probs = np.array([mix[t] for t in types], float)
     probs /= probs.sum()
-    units = {}
-    for veh, g in clean.groupby("vehicle"):
-        uc = s["uc"][veh]
-        units[veh] = (uc, 10.0 ** -s["dd"][veh])
     if units_override:
         units = dict(units_override)
+    else:
+        units = {veh: (s["uc"][veh], 10.0 ** -s["dd"][veh]) for veh in clean["vehicle"].unique()}
     n = len(dirty)
     last_err = {v: -10**9 for v in units}
     order = list(range(n))

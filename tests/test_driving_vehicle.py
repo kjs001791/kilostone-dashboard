@@ -1,4 +1,4 @@
-"""Tests for title-based vehicle recognition, the relaxed sheet admission, vehicles.toml and the two-relation distance fix."""
+"""Tests for title-based vehicle recognition, the relaxed sheet admission, dim_vehicle.csv and the two-relation distance fix."""
 import datetime as dt
 import sys
 from pathlib import Path
@@ -90,45 +90,15 @@ def test_date_and_measure_without_known_layout_loads_when_title_says_driving(tmp
 
 
 def test_vehicle_table_assigns_id_only_when_exactly_one_entry_matches(tmp_path):
-    toml = tmp_path / "v.toml"
-    toml.write_text("""[[vehicle]]
-vehicle_id = ""
-brand = ""
-model = ""
-model_year = ""
-service_start = ""
-service_end = ""
-title_words = []
-
-[[vehicle]]
-vehicle_id = "V03"
-brand = "대우"
-model = "프리마"
-model_year = "2019"
-service_start = "2019-01-01"
-service_end = "2023-12-31"
-title_words = ["대우프리마"]
-
-[[vehicle]]
-vehicle_id = "V01"
-brand = "스카니아"
-model = "R450"
-model_year = "2016"
-service_start = "2016-01-01"
-service_end = "2018-12-31"
-title_words = []
-
-[[vehicle]]
-vehicle_id = "V04"
-brand = "스카니아"
-model = "R500"
-model_year = "2023"
-service_start = "2024-01-01"
-service_end = ""
-title_words = []
-""", encoding="utf-8")
-    table = load_vehicle_table(toml)
-    assert [e["id"] for e in table] == ["V03", "V01", "V04"]  # the empty template entry is ignored
+    csv_path = tmp_path / "v.csv"
+    csv_path.write_text(
+        "vehicle_id,brand,model,model_year,color,service_start,service_end,title_words,note\n"
+        ",,,,,,,,\n"
+        "V03,대우,프리마,2019,,2019-01-01,2023-12-31,대우프리마,\n"
+        "V01,스카니아,R450,2016,,2016-01-01,2018-12-31,,\n"
+        "V04,스카니아,R500,2023,,2024-01-01,,,\n", encoding="utf-8")
+    table = load_vehicle_table(csv_path)
+    assert [e["id"] for e in table] == ["V03", "V01", "V04"]  # the empty row is ignored
     rows = pd.DataFrame({"vehicle": ["Daewoo", "Daewoo", "Scania", "Scania", "Scania"],
                          "vehicle_title": ["대우프리마 운행", "대우프리마 운행"] + ["스카니아 운행"] * 3,
                          "vehicle_model_key": ["Daewoo", "Daewoo", "Scania", "Scania", "Scania"], "vehicle_id": [""] * 5,
@@ -138,8 +108,26 @@ title_words = []
     assert list(out["vehicle_id"]) == ["V03", "", "V01", "V04", ""]
     assert list(out["vehicle"][[0, 2, 3]]) == ["V03", "V01", "V04"]
     assert counts["assigned"] == 3 and counts["unmatched"] == 2
-    # the shipped template is empty
-    assert load_vehicle_table(Path(__file__).resolve().parent.parent / "pipeline" / "vehicles.toml") == []
+
+
+def test_title_without_model_word_is_matched_by_date_alone(tmp_path):
+    csv_path = tmp_path / "v.csv"
+    csv_path.write_text(
+        "vehicle_id,brand,model,model_year,color,service_start,service_end,title_words,note\n"
+        "V02,MAN,,,,2015-01-01,2019-03-31,,\n"
+        "V03,Daewoo,,,,2019-04-01,2023-08-31,,\n", encoding="utf-8")
+    rows = pd.DataFrame({"vehicle": ["unk-a1", "unk-a1", "Daewoo"], "vehicle_title": ["트렉터 운행일지"] * 2 + ["대우프리마 운행"],
+                         "vehicle_model_key": ["", "", "Daewoo"], "vehicle_id": [""] * 3,
+                         "date": pd.to_datetime(["2017-05-01", "2020-05-01", "2018-05-01"])})
+    out, counts = assign_vehicle_ids(rows, load_vehicle_table(csv_path))
+    # no model word: the date decides (V02 in 2017, V03 in 2020); a known model word outside its period stays unmatched
+    assert list(out["vehicle_id"]) == ["V02", "V03", ""]
+
+
+def test_shipped_vehicle_table_has_four_cars():
+    table = load_vehicle_table(Path(__file__).resolve().parent.parent / "pipeline" / "dim_vehicle.csv")
+    assert [e["id"] for e in table] == ["V01", "V02", "V03", "V04"]
+    assert [e["brand_key"].lower() for e in table] == ["scania", "man", "daewoo", "scania"]
 
 
 def test_provisional_period_split_for_one_brand_with_another_car_between():

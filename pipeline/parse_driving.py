@@ -9,7 +9,7 @@ import hashlib
 import json
 import re
 import sys
-import tomllib
+import csv
 import warnings
 from collections import Counter
 from pathlib import Path
@@ -34,7 +34,7 @@ MODEL_WORDS = [
     (re.compile(r"(?<![a-z])man(?![a-z])|tgx"), "MAN"),
 ]
 DRIVING_WORD = "운행"  # a title holding this word marks the sheet as a driving log
-VEHICLES_PATH = ROOT / "pipeline" / "vehicles.toml"
+VEHICLES_PATH = ROOT / "pipeline" / "dim_vehicle.csv"
 SCAN_ROWS = 40
 
 
@@ -315,20 +315,22 @@ def parse_folder(folder: Path):
     return files, all_rows, recon, quarantine_files, unmatched_all, bad_all, vehicle_src, mismatch, n_sheets, n_parsed
 
 
-# ---------------------------------------------------------------- vehicle table (pipeline/vehicles.toml)
+# ---------------------------------------------------------------- vehicle table (pipeline/dim_vehicle.csv)
 def load_vehicle_table(path: Path = VEHICLES_PATH) -> list:
-    """Filled entries of vehicles.toml. An entry counts when vehicle_id (a meaningless number such as V01) is filled."""
+    """Filled rows of dim_vehicle.csv. A row counts when vehicle_id (a meaningless number such as V01) is filled.
+    title_words is one cell; several words are separated by ';'."""
     if not Path(path).exists():
         return []
-    with open(path, "rb") as f:
-        raw = tomllib.load(f).get("vehicle", [])
+    with open(path, encoding="utf-8-sig", newline="") as f:
+        raw = list(csv.DictReader(f))
     out = []
     for e in raw:
+        e = {k: (v or "") for k, v in e.items()}
         vid = str(e.get("vehicle_id", "")).strip()
         if not vid:
             continue
         brand = str(e.get("brand", "")).strip()
-        words = [re.sub(r"\s+", "", str(w).lower()) for w in e.get("title_words", []) if str(w).strip()]
+        words = [re.sub(r"\s+", "", w.lower()) for w in str(e.get("title_words", "")).split(";") if w.strip()]
         out.append({"id": vid, "brand": brand, "brand_key": (model_key_of(brand) if brand else "") or re.sub(r"\s+", "", brand.lower()),
                     "model": str(e.get("model", "")).strip(), "year": str(e.get("model_year", "")).strip(), "words": words,
                     "start": pd.Timestamp(e["service_start"]) if str(e.get("service_start", "")).strip() else None,
@@ -340,7 +342,8 @@ def assign_vehicle_ids(df: pd.DataFrame, table: list):
     """Set vehicle_id (and `vehicle`, the grouping key) on rows that match exactly one table entry by brand (or title word) and by service dates.
 
     Brand = the brand key found in the title, a title word of the entry, or the entry's brand text inside the title. Two cars of one brand are
-    told apart by their service dates. Returns (frame, counts) with counts = assigned / ambiguous / unmatched rows.
+    told apart by their service dates. A row whose title holds no known model word (vehicle_model_key empty) is matched by date alone: one
+    truck runs at a time, so the service period names the car. Returns (frame, counts) with counts = assigned / ambiguous / unmatched rows.
     """
     counts = Counter()
     if not table or df.empty:
@@ -351,7 +354,7 @@ def assign_vehicle_ids(df: pd.DataFrame, table: list):
         flat = re.sub(r"\s+", "", str(t).lower())
         hits = []
         for e in table:
-            by_name = (any(w in flat for w in e["words"]) or (mk and mk.lower() == e["brand_key"].lower())
+            by_name = (not mk or any(w in flat for w in e["words"]) or mk.lower() == e["brand_key"].lower()
                        or (e["brand_key"] and e["brand_key"].lower() in flat))
             in_range = (e["start"] is None or d >= e["start"]) and (e["end"] is None or d <= e["end"])
             if by_name and in_range:
@@ -375,7 +378,7 @@ PERIOD_GAP_DAYS = 30
 
 
 def split_periods(df: pd.DataFrame):
-    """Provisional split of one brand key into periods (Scania-1, Scania-2) while vehicles.toml is empty.
+    """Provisional split of one brand key into periods (Scania-1, Scania-2) while dim_vehicle.csv is empty.
 
     A break is made where one key's rows stop for more than PERIOD_GAP_DAYS and other keys have rows inside the gap (another car ran meanwhile).
     A break is kept only when both sides hold at least MIN_PERIOD_ROWS rows. Rows that already have a vehicle_id are left alone.
